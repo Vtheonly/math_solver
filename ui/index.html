@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Solver — Step-by-Step</title>
+<meta name="description" content="Solve equations, simplify expressions, and plot functions step-by-step.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="window.__katexReady=true"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+/* ── Reset & tokens ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #f7f8fc;
+  --surface:    #ffffff;
+  --surface-2:  #f2f4fa;
+  --border:     #e2e6f0;
+  --primary:    #4f63d2;
+  --primary-lt: #eef0fc;
+  --primary-dk: #3a4db8;
+  --success:    #1e9e6b;
+  --success-lt: #e8f8f2;
+  --success-bdr:#a3dfc8;
+  --error:      #c0392b;
+  --error-lt:   #fdf0f0;
+  --error-bdr:  #f0b8b2;
+  --text:       #1c1e2e;
+  --text-2:     #5a5f7a;
+  --text-3:     #9096b4;
+  --mono:       'JetBrains Mono', 'Courier New', monospace;
+  --radius:     8px;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow:     0 4px 12px rgba(0,0,0,.08);
+  --transition: 150ms ease;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 24px 20px 60px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.header-icon {
+  width: 42px; height: 42px;
+  background: var(--primary);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 1.2rem; color: #fff;
+}
+
+.header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 2px; }
+.header-sub { color: var(--text-2); font-size: 0.82rem; }
+
+/* ── Card ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
+/* ── Mode tabs ────────────────────────────────────────────── */
+.mode-tabs {
+  display: flex; gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.mode-tab {
+  flex: 1; padding: 7px 10px; border: none;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent; color: var(--text-2);
+  font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+}
+.mode-tab:hover:not(.active) { background: rgba(79,99,210,.07); color: var(--primary); }
+.mode-tab.active { background: var(--surface); color: var(--primary); font-weight: 600; box-shadow: var(--shadow-sm); }
+
+/* ── Input row ────────────────────────────────────────────── */
+.input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.input-wrap { flex: 1; }
+
+input[type="text"] {
+  width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 9px 12px; font-size: 0.92rem; font-family: var(--mono);
+  color: var(--text); background: var(--surface); outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+input[type="text"]::placeholder { color: var(--text-3); }
+input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,99,210,.12); }
+
+.btn-solve {
+  border: none; border-radius: var(--radius); background: var(--primary); color: #fff;
+  font-family: 'Inter', sans-serif; font-size: 0.88rem; font-weight: 600;
+  padding: 9px 20px; cursor: pointer; white-space: nowrap;
+  transition: background var(--transition), transform var(--transition);
+}
+.btn-solve:hover:not(:disabled) { background: var(--primary-dk); transform: translateY(-1px); }
+.btn-solve:active:not(:disabled) { transform: translateY(0); }
+.btn-solve:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Chips ────────────────────────────────────────────────── */
+.examples-label {
+  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3); margin-bottom: 5px;
+}
+.examples { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.chip {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text-2); font-size: 0.74rem; font-family: var(--mono);
+  padding: 3px 8px; cursor: pointer; user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.chip:hover { background: var(--primary-lt); border-color: var(--primary); color: var(--primary); }
+
+/* ── TWO-COLUMN LAYOUT ────────────────────────────────────── */
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+/* ── Left: Results ────────────────────────────────────────── */
+.results-col { min-width: 0; }
+
+/* ── Right: Plotter + Formula Builder ─────────────────────── */
+.tools-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── Loader ───────────────────────────────────────────────── */
+.loader {
+  display: none; align-items: center; justify-content: center;
+  gap: 8px; padding: 16px; color: var(--text-2); font-size: 0.84rem;
+}
+.spinner {
+  width: 18px; height: 18px; border: 2.5px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin .6s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Solution box ─────────────────────────────────────────── */
+.sol-box {
+  background: var(--success-lt); border: 1.5px solid var(--success-bdr);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; text-align: center;
+}
+.sol-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--success); margin-bottom: 8px;
+}
+.sol-val { font-size: 1.15rem; color: var(--text); margin-bottom: 2px; line-height: 1.5; }
+.sol-dec { color: var(--text-2); font-size: 0.8rem; font-family: var(--mono); }
+.num-badge {
+  display: inline-block; background: #fff7e6; border: 1px solid #f7c86a;
+  border-radius: 5px; color: #a06000; font-size: 0.7rem; font-weight: 500;
+  padding: 2px 8px; margin-top: 6px;
+}
+
+/* ── Error box ────────────────────────────────────────────── */
+.err-box {
+  background: var(--error-lt); border: 1.5px solid var(--error-bdr);
+  border-radius: var(--radius); color: var(--error); padding: 12px 14px;
+  margin-bottom: 10px; font-size: 0.85rem; display: flex; align-items: flex-start; gap: 7px;
+}
+.err-icon { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Steps ────────────────────────────────────────────────── */
+.steps-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3); margin-bottom: 8px;
+}
+.step {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary); border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 7px;
+  transition: box-shadow var(--transition);
+}
+.step:hover { box-shadow: var(--shadow); }
+.step-hdr { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.step-n {
+  background: var(--primary-lt); border-radius: 4px; color: var(--primary);
+  font-size: 0.66rem; font-weight: 700; padding: 2px 7px;
+  text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0;
+}
+.step-title { font-weight: 600; font-size: 0.86rem; }
+.step-desc { color: var(--text-2); font-size: 0.82rem; margin-bottom: 7px; line-height: 1.5; }
+.step-eq {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 8px 14px; text-align: center;
+  font-size: 1rem; overflow-x: auto;
+}
+
+/* ── Plot panel ───────────────────────────────────────────── */
+.plot-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  overflow: hidden; position: relative;
+}
+
+.plot-panel.expanded {
+  position: fixed; top: 20px; left: 20px; right: 20px; bottom: 20px;
+  z-index: 200; box-shadow: 0 12px 40px rgba(0,0,0,.18);
+}
+
+.plot-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.plot-header-title {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3);
+}
+.plot-expand-btn {
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+  color: var(--text-2); font-size: 0.72rem; padding: 2px 8px; cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.plot-expand-btn:hover { background: var(--primary-lt); color: var(--primary); }
+
+.plot-body { padding: 6px; }
+
+#plotly-graph {
+  width: 100%; height: 300px;
+  border-radius: 4px;
+}
+
+.plot-panel.expanded #plotly-graph { height: calc(100vh - 100px); }
+
+.plot-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 180px; color: var(--text-3); font-size: 0.84rem; gap: 8px;
+}
+.plot-empty-icon { font-size: 2rem; opacity: .4; }
+
+/* ── Formula builder ──────────────────────────────────────── */
+.fb-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.fb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.fb-header-title {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3);
+}
+
+.fb-body { padding: 10px 12px; }
+
+.fb-section-label {
+  font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3); margin-bottom: 4px; margin-top: 8px;
+}
+.fb-section-label:first-child { margin-top: 0; }
+
+.fb-row { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 3px; }
+
+.fb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 28px; padding: 0 6px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); color: var(--text);
+  font-family: var(--mono); font-size: 0.78rem; cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.fb-btn:hover { background: var(--primary-lt); border-color: var(--primary); color: var(--primary); }
+.fb-btn .fb-label { font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 500; }
+
+.fb-preview {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 8px 12px; margin-top: 8px;
+  min-height: 34px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.95rem; color: var(--text-2);
+}
+.fb-preview:empty::before {
+  content: 'Type or click buttons — preview appears here';
+  color: var(--text-3); font-size: 0.76rem; font-style: italic;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip); position: absolute;
+  bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: #1c1e2e; color: #fff;
+  font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 400;
+  line-height: 1.35; padding: 5px 9px; border-radius: 5px;
+  max-width: 220px; white-space: normal; text-align: center;
+  pointer-events: none; opacity: 0;
+  transition: opacity .12s ease, transform .12s ease; z-index: 150;
+}
+[data-tooltip]::before {
+  content: ''; position: absolute;
+  bottom: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+  border: 4px solid transparent; border-top-color: #1c1e2e;
+  pointer-events: none; opacity: 0; transition: opacity .12s ease; z-index: 150;
+}
+[data-tooltip]:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+[data-tooltip]:hover::before { opacity: 1; }
+
+[data-tooltip-pos="bottom"]::after {
+  bottom: auto; top: calc(100% + 6px); transform: translateX(-50%) translateY(-3px);
+}
+[data-tooltip-pos="bottom"]:hover::after { transform: translateX(-50%) translateY(0); }
+[data-tooltip-pos="bottom"]::before {
+  bottom: auto; top: calc(100% + 1px); border-top-color: transparent; border-bottom-color: #1c1e2e;
+}
+
+/* ── KaTeX ────────────────────────────────────────────────── */
+.katex-display { margin: 0; }
+
+/* ── Overlay for expanded plot ────────────────────────────── */
+.plot-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.35); z-index: 199;
+}
+.plot-overlay.show { display: block; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .workspace { grid-template-columns: 1fr; }
+  .mode-tab { font-size: 0.76rem; padding: 6px 5px; }
+  .btn-solve { padding: 9px 12px; }
+  .header h1 { font-size: 1.2rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon" aria-hidden="true">∑</div>
+    <div>
+      <h1>Math Solver</h1>
+      <p class="header-sub">Step-by-step equations · Simplification · Function plotting</p>
+    </div>
+  </div>
+
+  <!-- Input card (full width) -->
+  <div class="card">
+    <div class="mode-tabs" role="tablist">
+      <button class="mode-tab active" data-mode="solver"
+        data-tooltip="Solve equations for unknowns — linear, quadratic, systems &amp; more"
+        onclick="switchMode('solver')">⚙ Solver</button>
+      <button class="mode-tab" data-mode="simplifier"
+        data-tooltip="Expand, factor, and simplify algebraic expressions"
+        onclick="switchMode('simplifier')">✦ Simplifier</button>
+      <button class="mode-tab" data-mode="plotter"
+        data-tooltip="Plot 2-D / 3-D functions, animate with parameter t"
+        onclick="switchMode('plotter')">◲ Plotter</button>
+    </div>
+
+    <div class="input-row">
+      <div class="input-wrap">
+        <input type="text" id="eq" placeholder="e.g.  x^2 - 5x + 6 = 0"
+          autocomplete="off" spellcheck="false" aria-label="Enter equation" />
+      </div>
+      <button class="btn-solve" id="btn" onclick="solve()"
+        data-tooltip="Run the solver (or press Enter)">Solve</button>
+    </div>
+
+    <div class="examples-label">Quick examples</div>
+    <div class="examples" id="examples-container"></div>
+  </div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader"><div class="spinner"></div><span>Solving…</span></div>
+
+  <!-- Two-column workspace -->
+  <div class="workspace">
+
+    <!-- LEFT: steps / solutions -->
+    <div class="results-col" id="out"></div>
+
+    <!-- RIGHT: plotter (top) + formula builder (bottom) -->
+    <div class="tools-col">
+
+      <!-- Plot panel -->
+      <div class="plot-panel" id="plot-panel">
+        <div class="plot-header">
+          <span class="plot-header-title">Graph</span>
+          <button class="plot-expand-btn" id="plot-expand-btn" onclick="toggleExpandPlot()"
+            data-tooltip="Expand graph to full screen">⛶ Expand</button>
+        </div>
+        <div class="plot-body">
+          <div id="plotly-graph">
+            <div class="plot-empty">
+              <span class="plot-empty-icon">◲</span>
+              Use Plotter mode or enter a function to see a graph
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formula builder panel -->
+      <div class="fb-panel">
+        <div class="fb-header">
+          <span class="fb-header-title">Formula Builder</span>
+        </div>
+        <div class="fb-body">
+
+          <div class="fb-section-label">Operators</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Addition" onclick="fbInsert(' + ')">+</button>
+            <button class="fb-btn" data-tooltip="Subtraction" onclick="fbInsert(' - ')">−</button>
+            <button class="fb-btn" data-tooltip="Multiplication" onclick="fbInsert(' * ')">×</button>
+            <button class="fb-btn" data-tooltip="Division" onclick="fbInsert(' / ')">÷</button>
+            <button class="fb-btn" data-tooltip="Equals" onclick="fbInsert(' = ')">=</button>
+            <button class="fb-btn" data-tooltip="Open paren" onclick="fbInsert('(')">(</button>
+            <button class="fb-btn" data-tooltip="Close paren" onclick="fbInsert(')')">)</button>
+            <button class="fb-btn" data-tooltip="Comma — separate system equations" onclick="fbInsert(', ')">,</button>
+          </div>
+
+          <div class="fb-section-label">Powers & Roots</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Raise to power" onclick="fbInsert('^')"><span class="fb-label">xⁿ</span></button>
+            <button class="fb-btn" data-tooltip="Squared" onclick="fbInsert('^2')"><span class="fb-label">x²</span></button>
+            <button class="fb-btn" data-tooltip="Cubed" onclick="fbInsert('^3')"><span class="fb-label">x³</span></button>
+            <button class="fb-btn" data-tooltip="Square root" onclick="fbInsert('sqrt()')"><span class="fb-label">√x</span></button>
+            <button class="fb-btn" data-tooltip="Nth root — e.g. x^(1/3)" onclick="fbInsert('^(1/)')"><span class="fb-label">ⁿ√x</span></button>
+            <button class="fb-btn" data-tooltip="Absolute value" onclick="fbInsert('||')"><span class="fb-label">|x|</span></button>
+          </div>
+
+          <div class="fb-section-label">Fractions</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Fraction a/b" onclick="fbInsert('()/()')"><span class="fb-label">a/b</span></button>
+            <button class="fb-btn" data-tooltip="Reciprocal 1/x" onclick="fbInsert('1/()')"><span class="fb-label">1/x</span></button>
+            <button class="fb-btn" data-tooltip="One half" onclick="fbInsert('1/2')"><span class="fb-label">½</span></button>
+            <button class="fb-btn" data-tooltip="One third" onclick="fbInsert('1/3')"><span class="fb-label">⅓</span></button>
+            <button class="fb-btn" data-tooltip="Three quarters" onclick="fbInsert('3/4')"><span class="fb-label">¾</span></button>
+          </div>
+
+          <div class="fb-section-label">Trigonometry</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Sine" onclick="fbInsert('sin()')"><span class="fb-label">sin</span></button>
+            <button class="fb-btn" data-tooltip="Cosine" onclick="fbInsert('cos()')"><span class="fb-label">cos</span></button>
+            <button class="fb-btn" data-tooltip="Tangent" onclick="fbInsert('tan()')"><span class="fb-label">tan</span></button>
+            <button class="fb-btn" data-tooltip="Arcsine (inverse sin)" onclick="fbInsert('asin()')"><span class="fb-label">sin⁻¹</span></button>
+            <button class="fb-btn" data-tooltip="Arccosine (inverse cos)" onclick="fbInsert('acos()')"><span class="fb-label">cos⁻¹</span></button>
+            <button class="fb-btn" data-tooltip="Arctangent (inverse tan)" onclick="fbInsert('atan()')"><span class="fb-label">tan⁻¹</span></button>
+          </div>
+
+          <div class="fb-section-label">Logarithms & Exponentials</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Natural log (ln)" onclick="fbInsert('ln()')"><span class="fb-label">ln</span></button>
+            <button class="fb-btn" data-tooltip="Log base 10" onclick="fbInsert('log()')"><span class="fb-label">log</span></button>
+            <button class="fb-btn" data-tooltip="Log base b — log(x, b)" onclick="fbInsert('log(, )')"><span class="fb-label">logₐ</span></button>
+            <button class="fb-btn" data-tooltip="e raised to power" onclick="fbInsert('e^()')"><span class="fb-label">eˣ</span></button>
+            <button class="fb-btn" data-tooltip="10 raised to power" onclick="fbInsert('10^()')"><span class="fb-label">10ˣ</span></button>
+            <button class="fb-btn" data-tooltip="2 raised to power" onclick="fbInsert('2^()')"><span class="fb-label">2ˣ</span></button>
+          </div>
+
+          <div class="fb-section-label">Variables & Constants</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="Variable x" onclick="fbInsert('x')">x</button>
+            <button class="fb-btn" data-tooltip="Variable y" onclick="fbInsert('y')">y</button>
+            <button class="fb-btn" data-tooltip="Variable z" onclick="fbInsert('z')">z</button>
+            <button class="fb-btn" data-tooltip="Parameter t (animation)" onclick="fbInsert('t')">t</button>
+            <button class="fb-btn" data-tooltip="Pi ≈ 3.14159" onclick="fbInsert('pi')"><span class="fb-label">π</span></button>
+            <button class="fb-btn" data-tooltip="Euler's number ≈ 2.718" onclick="fbInsert('e')"><span class="fb-label">e</span></button>
+            <button class="fb-btn" data-tooltip="Infinity" onclick="fbInsert('oo')"><span class="fb-label">∞</span></button>
+          </div>
+
+          <div class="fb-section-label">Systems & Templates</div>
+          <div class="fb-row">
+            <button class="fb-btn" data-tooltip="2-variable system template" onclick="fbTemplate('2sys')" style="min-width:60px">
+              <span class="fb-label">2-var sys</span>
+            </button>
+            <button class="fb-btn" data-tooltip="3-variable system template" onclick="fbTemplate('3sys')" style="min-width:60px">
+              <span class="fb-label">3-var sys</span>
+            </button>
+            <button class="fb-btn" data-tooltip="Quadratic template ax²+bx+c=0" onclick="fbTemplate('quad')" style="min-width:60px">
+              <span class="fb-label">ax²+bx+c</span>
+            </button>
+            <button class="fb-btn" data-tooltip="Clear input" onclick="fbClear()" style="min-width:44px; color: var(--error);">
+              <span class="fb-label">Clear</span>
+            </button>
+          </div>
+
+          <!-- Live preview -->
+          <div class="fb-section-label">Live preview</div>
+          <div class="fb-preview" id="fb-preview"></div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Overlay for expanded plot -->
+<div class="plot-overlay" id="plot-overlay" onclick="toggleExpandPlot()"></div>
+
+<script>
+/* ── State ── */
+let currentMode = 'solver';
+let plotExpanded = false;
+
+const EXAMPLES = {
+  solver: [
+    { label: '2x+4=10',    expr: '2x + 4 = 10',                tip: 'Linear equation' },
+    { label: 'x²-5x+6=0', expr: 'x^2 - 5x + 6 = 0',           tip: 'Quadratic' },
+    { label: 'x³ cubic',   expr: 'x^3 - 6x^2 + 11x - 6 = 0',  tip: 'Cubic' },
+    { label: 'fraction',   expr: '(x+1)/(x-2) = 3/4',          tip: 'Rational' },
+    { label: 'rational',   expr: '1/x + 1/(x+2) = 1/3',        tip: 'Sum of fractions' },
+    { label: 'log',        expr: 'log(x) + log(x-3) = 1',      tip: 'Logarithmic' },
+    { label: '2^x=32',     expr: '2^x = 32',                   tip: 'Exponential' },
+    { label: 'sin(x)',     expr: 'sin(x) = 0.5',               tip: 'Trig' },
+    { label: '|x-3|=5',   expr: '|x - 3| = 5',                tip: 'Absolute value' },
+    { label: 'system',    expr: '2x + y = 10, x - y = 2',      tip: '2-var system' },
+    { label: '3-var',     expr: 'x+y+z=6, 2x-y+z=3, x+2y-z=2', tip: '3-var system' },
+  ],
+  simplifier: [
+    { label: 'expand',     expr: '(x+2)^3',             tip: 'Binomial cube' },
+    { label: 'factor',     expr: 'x^2 - 9',             tip: 'Difference of squares' },
+    { label: 'simplify',   expr: '(x^2 - 1)/(x - 1)',   tip: 'Cancel common factors' },
+    { label: 'trig ID',    expr: 'sin(x)^2 + cos(x)^2', tip: 'Pythagorean identity' },
+    { label: 'partial',    expr: '1/(x^2 - 1)',          tip: 'Partial fractions' },
+  ],
+  plotter: [
+    { label: 'x²',        expr: 'x^2',              tip: 'Parabola' },
+    { label: 'sin(x)',     expr: 'sin(x)',            tip: 'Sine wave' },
+    { label: '3D',         expr: 'sin(x) * cos(y)',   tip: 'Surface plot' },
+    { label: 'animation',  expr: 'sin(x - t)',        tip: 'Animated wave' },
+    { label: 'tan(x)',     expr: 'tan(x)',            tip: 'Tangent' },
+    { label: 'x³-3x',     expr: 'x^3 - 3*x',        tip: 'Cubic curve' },
+  ],
+};
+
+/* ── Mode ── */
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  buildExamples();
+  const ph = { solver:'e.g.  x^2 - 5x + 6 = 0', simplifier:'e.g.  (x+2)^3', plotter:'e.g.  sin(x)' };
+  document.getElementById('eq').placeholder = ph[mode] || ph.solver;
+  document.getElementById('eq').focus();
+}
+
+function buildExamples() {
+  const c = document.getElementById('examples-container');
+  const list = EXAMPLES[currentMode] || [];
+  c.innerHTML = list.map(e =>
+    `<span class="chip" data-tooltip="${e.tip}" data-tooltip-pos="bottom"
+       onclick="eg('${e.expr.replace(/'/g,"\\'")}','${e.mode||currentMode}')">${e.label}</span>`
+  ).join('');
+}
+
+/* ── Init ── */
+buildExamples();
+document.getElementById('eq').addEventListener('keydown', e => { if (e.key==='Enter') solve(); });
+document.getElementById('eq').addEventListener('input', updatePreview);
+
+/* ── Helpers ── */
+function eg(expr, mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  buildExamples();
+  document.getElementById('eq').value = expr;
+  solve();
+}
+
+function renderMath(el) {
+  function go() {
+    renderMathInElement(el, {
+      delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError: false
+    });
+  }
+  if (window.__katexReady) go(); else setTimeout(go, 300);
+}
+
+/* ── Formula builder ── */
+function fbInsert(text) {
+  const input = document.getElementById('eq');
+  const start = input.selectionStart, end = input.selectionEnd, val = input.value;
+  const pi = text.indexOf('()');
+  if (pi !== -1) {
+    const before = text.substring(0, pi+1), after = text.substring(pi+1);
+    input.value = val.substring(0,start) + before + after + val.substring(end);
+    input.setSelectionRange(start+before.length, start+before.length);
+  } else if (text === '||') {
+    // absolute value — put cursor between pipes
+    input.value = val.substring(0,start) + '|' + val.substring(start,end) + '|' + val.substring(end);
+    if (start === end) input.setSelectionRange(start+1, start+1);
+    else input.setSelectionRange(start, end+2);
+  } else {
+    input.value = val.substring(0,start) + text + val.substring(end);
+    input.setSelectionRange(start+text.length, start+text.length);
+  }
+  input.focus();
+  updatePreview();
+}
+
+function fbTemplate(type) {
+  const input = document.getElementById('eq');
+  const templates = {
+    '2sys': 'ax + by = c, dx + ey = f',
+    '3sys': 'x + y + z = 0, x - y + z = 0, x + 2y - z = 0',
+    'quad': 'x^2 + bx + c = 0',
+  };
+  input.value = templates[type] || '';
+  input.focus();
+  input.setSelectionRange(0, input.value.length);
+  updatePreview();
+}
+
+function fbClear() {
+  const input = document.getElementById('eq');
+  input.value = '';
+  input.focus();
+  updatePreview();
+}
+
+function updatePreview() {
+  const raw = document.getElementById('eq').value.trim();
+  const preview = document.getElementById('fb-preview');
+  if (!raw) { preview.innerHTML = ''; return; }
+  try {
+    let latex = raw
+      .replace(/\*\*/g, '^')
+      .replace(/\*/g, ' \\cdot ')
+      .replace(/sqrt\(([^)]*)\)/g, '\\sqrt{$1}')
+      .replace(/sin\(/g, '\\sin(').replace(/cos\(/g, '\\cos(').replace(/tan\(/g, '\\tan(')
+      .replace(/asin\(/g, '\\arcsin(').replace(/acos\(/g, '\\arccos(').replace(/atan\(/g, '\\arctan(')
+      .replace(/log\(/g, '\\log(').replace(/ln\(/g, '\\ln(')
+      .replace(/\bpi\b/g, '\\pi').replace(/\boo\b/g, '\\infty')
+      .replace(/(\d+)\/(\d+)/g, '\\frac{$1}{$2}');
+    if (window.katex) {
+      preview.innerHTML = '';
+      katex.render(latex, preview, { throwOnError: false, displayMode: true });
+    } else { preview.textContent = raw; }
+  } catch { preview.textContent = raw; }
+}
+
+/* ── Plot expand ── */
+function toggleExpandPlot() {
+  plotExpanded = !plotExpanded;
+  document.getElementById('plot-panel').classList.toggle('expanded', plotExpanded);
+  document.getElementById('plot-overlay').classList.toggle('show', plotExpanded);
+  document.getElementById('plot-expand-btn').textContent = plotExpanded ? '✕ Close' : '⛶ Expand';
+  // Resize plotly
+  const g = document.getElementById('plotly-graph');
+  if (g && g.data) { setTimeout(() => Plotly.Plots.resize(g), 200); }
+}
+
+/* ── Main solver ── */
+async function solve() {
+  const equation = document.getElementById('eq').value.trim();
+  if (!equation) return;
+  const btn = document.getElementById('btn');
+  const loader = document.getElementById('loader');
+  const out = document.getElementById('out');
+  btn.disabled = true;
+  loader.style.display = 'flex';
+  out.innerHTML = '';
+
+  try {
+    const res = await fetch('/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ equation, mode: currentMode }),
+    });
+    const data = await res.json();
+    loader.style.display = 'none';
+    btn.disabled = false;
+    render(data, out);
+  } catch (e) {
+    loader.style.display = 'none';
+    btn.disabled = false;
+    out.innerHTML = errBox('Server error — is the Python server running?');
+  }
+}
+
+/* ── Renderers ── */
+function errBox(msg) {
+  return `<div class="err-box"><span class="err-icon">⚠</span><span>${msg}</span></div>`;
+}
+
+function render(data, out) {
+  /* ── Graph → right panel ── */
+  if (data.graph_data && data.graph_data.is_graph) {
+    const gd = data.graph_data;
+    // Clear the placeholder in the plot panel
+    const plotEl = document.getElementById('plotly-graph');
+    plotEl.innerHTML = '';
+    const cfg = { responsive: true, displaylogo: false };
+    if (gd.type === 'animation' && gd.frames) {
+      Plotly.newPlot('plotly-graph', gd.traces, gd.layout, cfg)
+            .then(() => Plotly.addFrames('plotly-graph', gd.frames));
+    } else {
+      Plotly.newPlot('plotly-graph', gd.traces, gd.layout, cfg);
+    }
+    // Show a message on the left
+    out.innerHTML = `<div class="sol-box" style="background:var(--primary-lt);border-color:var(--primary);">
+      <div class="sol-label" style="color:var(--primary);">Graph Generated</div>
+      <div style="color:var(--text-2);font-size:.84rem;">The plot is displayed on the right →<br>Click <strong>⛶ Expand</strong> for full-screen view.</div>
+    </div>`;
+    return;
+  }
+
+  /* ── Error only ── */
+  if (data.error && (!data.steps || data.steps.length === 0)) {
+    out.innerHTML = errBox(data.error);
+    return;
+  }
+
+  let html = '';
+
+  /* ── Solutions ── */
+  const sols = data.solutions || [];
+  if (sols.length > 0) {
+    html += `<div class="sol-box">`;
+    const lbl = (data.is_numerical ? 'Numerical ' : '') + (sols.length === 1 ? 'Solution' : 'Solutions');
+    html += `<div class="sol-label">${lbl}</div>`;
+    if (data.is_system) {
+      for (const s of sols) {
+        html += `<div class="sol-val">$$${s.variable} = ${s.exact}$$</div>`;
+        if (s.decimal) html += `<div class="sol-dec">≈ ${parseFloat(s.decimal).toFixed(6)}</div>`;
+      }
+    } else {
+      for (const s of sols) {
+        html += `<div class="sol-val">$$${data.variable || 'x'} = ${s.exact}$$</div>`;
+        if (s.decimal && s.decimal !== s.exact) {
+          const n = parseFloat(s.decimal);
+          if (!isNaN(n)) html += `<div class="sol-dec">≈ ${n.toFixed(6)}</div>`;
+        }
+      }
+    }
+    if (data.is_numerical) html += `<div class="num-badge">numerical approximation</div>`;
+    html += `</div>`;
+  } else if (data.error) {
+    html += errBox(data.error);
+  } else {
+    html += errBox('No solution found.');
+  }
+
+  /* ── Steps ── */
+  const steps = data.steps || [];
+  if (steps.length) {
+    html += `<div class="steps-label">Step-by-step solution</div>`;
+    for (const s of steps) {
+      const desc = (s.description || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html += `<div class="step">
+        <div class="step-hdr">
+          <span class="step-n">Step ${s.step_number}</span>
+          <span class="step-title">${s.title}</span>
+        </div>`;
+      if (desc) html += `<div class="step-desc">${desc}</div>`;
+      if (s.equation) html += `<div class="step-eq">$$${s.equation}$$</div>`;
+      html += `</div>`;
+    }
+  }
+
+  out.innerHTML = html;
+  renderMath(out);
+}
+</script>
+</body>
+</html>
