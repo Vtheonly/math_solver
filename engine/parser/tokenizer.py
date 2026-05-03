@@ -19,32 +19,33 @@ logger = get_logger(__name__)
 class Tokenizer:
     """
     Preprocesses and normalizes equation input strings.
-
-    Handles:
-    - Caret to power conversion (^  → **)
-    - Natural log mapping (ln → log)
-    - Implicit multiplication hints
-    - Whitespace normalization
-    - Multiple equation splitting
-    - Absolute value notation normalization
     """
 
     # Pattern for splitting multiple equations
     SEPARATOR_PATTERN = re.compile(r"[\n,;]+")
 
     @staticmethod
+    def is_latex(text: str) -> bool:
+        """Detect if the input string is likely LaTeX."""
+        if "\\" in text:
+            return True
+        latex_patterns = [
+            r"^{", r"_{", r"\frac", r"\sqrt", r"\sin", r"\cos", r"\tan",
+            r"\int", r"\sum", r"\left", r"\right"
+        ]
+        return any(p in text for p in latex_patterns)
+
+    @staticmethod
+    def normalize_latex(text: str) -> str:
+        """Fix common OCR errors in LaTeX without breaking syntax."""
+        # Remove spaces between digits (e.g., "1 0" -> "10")
+        text = re.sub(r'(?<=\d)\s+(?=\d)', '', text)
+        # Collapse multiple spaces into one
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    @staticmethod
     def split_equations(raw_input: str) -> List[str]:
-        """
-        Split a raw input string into individual equation strings.
-
-        Supports newlines, commas, and semicolons as separators.
-
-        Args:
-            raw_input: The raw user input.
-
-        Returns:
-            List of stripped, non-empty equation strings.
-        """
         parts = Tokenizer.SEPARATOR_PATTERN.split(raw_input)
         equations = [p.strip() for p in parts if p.strip()]
         logger.debug("Split input into %d equation(s): %s", len(equations), equations)
@@ -52,35 +53,21 @@ class Tokenizer:
 
     @staticmethod
     def normalize(raw_input: str) -> str:
-        """
-        Normalize a single equation string for SymPy parsing.
-
-        Performs the following transformations:
-        1. Strip whitespace
-        2. Convert ^ to ** (power notation)
-        3. Convert ln( to log( (natural log)
-        4. Normalize absolute value notation |expr| → Abs(expr)
-        5. Normalize spaces around operators
-
-        Args:
-            raw_input: A single equation string.
-
-        Returns:
-            The normalized equation string.
-        """
         text = raw_input.strip()
         logger.debug("Tokenizing: '%s'", text)
 
-        # Step 1: Convert caret to power
+        # Detect if it's LaTeX. If so, DO NOT convert ^ to ** 
+        if "\\" in text or "_{" in text or "^{" in text:
+            # Fix spacing errors from OCR (e.g., "1 0" -> "10")
+            text = re.sub(r'(?<=\d)\s+(?=\d)', '', text)
+            text = re.sub(r'\s+', ' ', text)
+            logger.debug("Detected LaTeX. Safe normalized to: '%s'", text)
+            return text
+
+        # Standard plain-text normalization
         text = Tokenizer._convert_caret_to_power(text)
-
-        # Step 2: Convert natural log
         text = Tokenizer._convert_natural_log(text)
-
-        # Step 3: Normalize absolute value
         text = Tokenizer._normalize_absolute_value(text)
-
-        # Step 4: Normalize spacing
         text = Tokenizer._normalize_spacing(text)
 
         logger.debug("Normalized to: '%s'", text)
@@ -88,7 +75,6 @@ class Tokenizer:
 
     @staticmethod
     def _convert_caret_to_power(text: str) -> str:
-        """Convert ^ operator to ** for SymPy."""
         result = text.replace("^", "**")
         if "^" in text:
             logger.debug("Converted ^ to **: '%s' → '%s'", text, result)
@@ -96,21 +82,10 @@ class Tokenizer:
 
     @staticmethod
     def _convert_natural_log(text: str) -> str:
-        """Convert ln() to log() for SymPy (SymPy uses log for natural log)."""
-        result = re.sub(r'\bln\s*\(', 'log(', text)
-        return result
+        return re.sub(r'\bln\s*\(', 'log(', text)
 
     @staticmethod
     def _normalize_absolute_value(text: str) -> str:
-        """
-        Convert |expr| notation to Abs(expr).
-
-        Handles both simple and nested absolute value expressions.
-        This is a heuristic approach — complex nested cases may need
-        the user to use Abs() directly.
-        """
-        # Match |...| patterns, being careful with nested pipes
-        # Simple approach: find matching pipe pairs
         result = []
         i = 0
         pipe_positions = []
@@ -120,13 +95,9 @@ class Tokenizer:
                 pipe_positions.append(i)
             i += 1
 
-        # If we have an even number of pipes, pair them up
         if len(pipe_positions) >= 2 and len(pipe_positions) % 2 == 0:
-            # Replace from right to left to preserve positions
             paired = [(pipe_positions[j], pipe_positions[j + 1])
                       for j in range(0, len(pipe_positions), 2)]
-
-            # Build result string
             result = list(text)
             for open_pos, close_pos in reversed(paired):
                 inner = text[open_pos + 1:close_pos].strip()
@@ -134,35 +105,20 @@ class Tokenizer:
                 for k in range(open_pos, close_pos + 1):
                     result[k] = ''
                 result[open_pos] = replacement
-
             return ''.join(result)
-
         return text
 
     @staticmethod
     def _normalize_spacing(text: str) -> str:
-        """Normalize whitespace without changing semantics."""
-        # Collapse multiple spaces
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
 
     @staticmethod
     def validate_equation_string(text: str) -> Tuple[bool, str]:
-        """
-        Validate that a string looks like a valid equation.
-
-        Args:
-            text: The equation string to validate.
-
-        Returns:
-            Tuple of (is_valid, error_message). If valid, error_message is empty.
-        """
         if not text or not text.strip():
             return False, "Empty input"
 
         text = text.strip()
-
-        # Check for graphing or matrix exceptions
         if "=" not in text:
             raw_lower = text.lower()
             if raw_lower.startswith(("plot", "graph", "draw")):
@@ -176,40 +132,22 @@ class Tokenizer:
             else:
                 return False, "Input must contain an '=' sign to be an equation"
 
-        # Must not have multiple equals signs (unless it's a==b which we don't handle)
         equals_count = text.count("=")
         if equals_count > 1:
-            # Check for == which might be a comparison
             if "==" in text:
                 return False, "Use single '=' for equations, not '==' for comparisons"
-            # Multiple = could be a chained equation like a=b=c, split on first
             logger.warning("Multiple '=' signs found, splitting on first one")
 
-        # Must have at least one alphabetic character (variable or function)
         if not re.search(r'[a-zA-Z]', text):
-            # Could be purely numeric, which is fine but trivial
             logger.info("No alphabetic characters found in equation")
 
         return True, ""
 
     @staticmethod
     def split_on_equals(text: str) -> Tuple[str, str]:
-        """
-        Split an equation string on the first equals sign.
-
-        Args:
-            text: Equation string like "x^2 + 1 = 5"
-
-        Returns:
-            Tuple of (lhs_string, rhs_string)
-
-        Raises:
-            ValueError: If no equals sign is found.
-        """
         if "=" not in text:
             raw_lower = text.lower()
             if raw_lower.startswith(("plot", "graph", "draw")):
-                import re
                 pattern = re.compile(r'^(plot|graph|draw)\s+', re.IGNORECASE)
                 stripped_cmd = pattern.sub('', text)
                 return stripped_cmd, "0"
@@ -223,13 +161,10 @@ class Tokenizer:
             raise ValueError("Both sides of equation are empty")
 
         if not lhs:
-            rhs_expr = rhs
-            # Could be like "= 5" which means "0 = 5"
             logger.warning("Empty LHS, treating as 0 = %s", rhs)
             lhs = "0"
 
         if not rhs:
-            # Like "x + 1 =" which means "x + 1 = 0"
             logger.warning("Empty RHS, treating as %s = 0", lhs)
             rhs = "0"
 

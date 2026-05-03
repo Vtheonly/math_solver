@@ -118,8 +118,8 @@ class GraphGenerator:
 
     @staticmethod
     def _plot_3d(expr, var_x: sp.Symbol, var_y: sp.Symbol) -> Dict[str, Any]:
-        x_vals = np.linspace(-10, 10, 50)
-        y_vals = np.linspace(-10, 10, 50)
+        x_vals = np.linspace(-10, 10, 80)
+        y_vals = np.linspace(-10, 10, 80)
         X, Y = np.meshgrid(x_vals, y_vals)
         Z = GraphGenerator._evaluate(expr, [var_x, var_y], [X, Y])
         
@@ -128,9 +128,10 @@ class GraphGenerator:
             "y": y_vals.tolist(),
             "z": Z.tolist(),
             "type": "surface",
-            "colorscale": "Viridis",
+            "colorscale": "Plasma",
+            "showscale": False,
             "contours": {
-                "z": {"show": True, "usecolormap": True, "highlightcolor": "limegreen", "project": {"z": True}}
+                "z": {"show": True, "usecolormap": True, "highlightcolor": "white", "project": {"z": True}}
             }
         }]
 
@@ -181,7 +182,9 @@ class GraphGenerator:
                 "scene": {
                     "xaxis": {"title": str(var_x)},
                     "yaxis": {"title": str(var_y)},
-                    "zaxis": {"title": f"f({var_x}, {var_y})"}
+                    "zaxis": {"title": f"f({var_x}, {var_y})"},
+                    "aspectratio": {"x": 1, "y": 1, "z": 0.6},
+                    "camera": {"eye": {"x": 1.5, "y": 1.5, "z": 1.2}}
                 }
             }
         }
@@ -225,8 +228,8 @@ class GraphGenerator:
     @staticmethod
     def _plot_3d_animated(expr, var_x: sp.Symbol, var_y: sp.Symbol, param: str) -> Dict[str, Any]:
         p_sym = sp.Symbol(param)
-        x_vals = np.linspace(-10, 10, 30)
-        y_vals = np.linspace(-10, 10, 30)
+        x_vals = np.linspace(-10, 10, 50)
+        y_vals = np.linspace(-10, 10, 50)
         X, Y = np.meshgrid(x_vals, y_vals)
         
         frames = []
@@ -246,7 +249,8 @@ class GraphGenerator:
                 "y": y_vals.tolist(),
                 "z": Z_initial.tolist(),
                 "type": "surface",
-                "colorscale": "Viridis"
+                "colorscale": "Plasma",
+                "showscale": False
             }],
             "frames": frames,
             "layout": {
@@ -254,7 +258,9 @@ class GraphGenerator:
                 "scene": {
                     "xaxis": {"title": str(var_x)},
                     "yaxis": {"title": str(var_y)},
-                    "zaxis": {"title": "f(...)", "range": [-10, 10]}
+                    "zaxis": {"title": "f(...)", "range": [-10, 10]},
+                    "aspectratio": {"x": 1, "y": 1, "z": 0.6},
+                    "camera": {"eye": {"x": 1.5, "y": 1.5, "z": 1.2}}
                 },
                 "updatemenus": [{
                     "type": "buttons",

@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Solver — Pro Edition</title>
+<meta name="description" content="Solve equations, simplify expressions, and plot functions step-by-step.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="window.__katexReady=true"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+/* ── Theme Tokens ─────────────────────────────────────────── */
+:root {
+  --bg:         #f7f8fc;
+  --surface:    #ffffff;
+  --surface-2:  #f2f4fa;
+  --surface-3:  #e8eaf2;
+  --border:     #e2e6f0;
+  --primary:    #4f63d2;
+  --primary-lt: #eef0fc;
+  --primary-dk: #3a4db8;
+  --primary-glow:rgba(79,99,210,.15);
+  --secondary:  #e67e22;
+  --secondary-lt:#fff5eb;
+  --success:    #1e9e6b;
+  --success-lt: #e8f8f2;
+  --success-bdr:#a3dfc8;
+  --error:      #c0392b;
+  --error-lt:   #fdf0f0;
+  --error-bdr:  #f0b8b2;
+  --warning:    #d4a017;
+  --text:       #1c1e2e;
+  --text-2:     #5a5f7a;
+  --text-3:     #9096b4;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow:     0 4px 16px rgba(0,0,0,.08);
+  --shadow-lg:  0 12px 40px rgba(0,0,0,.12);
+  --radius:     10px;
+  --radius-sm:  6px;
+  --transition: 180ms cubic-bezier(.4,0,.2,1);
+  --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Courier New', monospace;
+}
+
+[data-theme="dark"] {
+  --bg:         #0f111a;
+  --surface:    #1a1d2d;
+  --surface-2:  #22263a;
+  --surface-3:  #2d3147;
+  --border:     #2f354d;
+  --primary:    #6b7fe6;
+  --primary-lt: #1f2340;
+  --primary-dk: #8a9af5;
+  --primary-glow:rgba(107,127,230,.20);
+  --secondary:  #f5a04c;
+  --secondary-lt:#2a2015;
+  --success:    #2ecc71;
+  --success-lt: #142b1f;
+  --success-bdr:#1e5c3f;
+  --error:      #e74c3c;
+  --error-lt:   #2b1515;
+  --error-bdr:  #5c2520;
+  --warning:    #f1c40f;
+  --text:       #e8eaf2;
+  --text-2:     #a0a6c0;
+  --text-3:     #5e6580;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow:     0 4px 16px rgba(0,0,0,.35);
+  --shadow-lg:  0 12px 40px rgba(0,0,0,.45);
+}
+
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 60px;
+  transition: background var(--transition), color var(--transition);
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ── Ngrok Banner ─────────────────────────────────────────── */
+.ngrok-banner {
+  background: var(--primary-dk);
+  color: white;
+  text-align: center;
+  padding: 8px 40px 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  position: relative;
+  transition: background var(--transition);
+}
+.ngrok-banner a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.ngrok-banner .close-banner {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; color: inherit;
+  font-size: 1.1rem; cursor: pointer; opacity: .7;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; transition: opacity .15s, background .15s;
+}
+.ngrok-banner .close-banner:hover { opacity: 1; background: rgba(255,255,255,.15); }
+.ngrok-banner.hidden { display: none; }
+
+/* ── Header ───────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.header-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dk));
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 1.3rem; color: #fff;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+.header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 2px; }
+.header-sub { color: var(--text-2); font-size: 0.82rem; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+
+.btn-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), transform .1s;
+}
+.btn-icon:hover { background: var(--surface-2); color: var(--primary); border-color: var(--primary); }
+.btn-icon:active { transform: scale(.95); }
+
+.btn-logout {
+  background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-2); font-size: 0.8rem; padding: 7px 14px; cursor: pointer;
+  font-weight: 500; transition: all var(--transition);
+}
+.btn-logout:hover { background: var(--error-lt); color: var(--error); border-color: var(--error-bdr); }
+
+/* ── Login Card ───────────────────────────────────────────── */
+.login-wrap { max-width: 420px; margin: 80px auto; }
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 32px;
+  position: relative;
+  overflow: hidden;
+}
+.login-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+}
+.login-card h2 { margin-bottom: 6px; font-size: 1.6rem; text-align: center; }
+.login-card .login-sub { text-align:center; color:var(--text-3); margin-bottom:28px; font-size:0.9rem; }
+.login-card .input-group { margin-bottom: 14px; }
+.login-card label {
+  display: block; font-size: 0.75rem; font-weight: 600;
+  color: var(--text-2); text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 5px;
+}
+.login-card input {
+  width: 100%; padding: 11px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); font-size: 0.95rem;
+  outline: none; transition: border-color var(--transition), box-shadow var(--transition);
+}
+.login-card input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.login-card .login-error {
+  color: var(--error); font-size: 0.82rem; margin: -4px 0 12px;
+  min-height: 1.2em; display: flex; align-items: center; gap: 5px;
+}
+.login-card button {
+  width: 100%; padding: 12px;
+  background: var(--primary); color: white; border: none;
+  border-radius: var(--radius-sm); font-weight: 600; font-size: 0.95rem;
+  cursor: pointer; transition: background var(--transition), transform .1s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.login-card button:hover:not(:disabled) { background: var(--primary-dk); }
+.login-card button:active:not(:disabled) { transform: translateY(1px); }
+.login-card button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Card ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+/* ── Mode tabs ────────────────────────────────────────────── */
+.mode-tabs {
+  display: flex; gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+  margin-bottom: 14px;
+}
+.mode-tab {
+  flex: 1; padding: 8px 10px; border: none;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent; color: var(--text-2);
+  font-family: var(--font-sans); font-size: 0.84rem; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.mode-tab:hover:not(.active) { background: var(--primary-glow); color: var(--primary); }
+.mode-tab.active {
+  background: var(--surface); color: var(--primary); font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.mode-tab .tab-icon { font-size: 1rem; line-height: 1; }
+
+/* ── Input row ────────────────────────────────────────────── */
+.input-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: stretch; }
+.input-wrap { flex: 1; position: relative; }
+
+input[type="text"] {
+  width: 100%; height: 100%;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 38px 10px 14px; font-size: 0.95rem; font-family: var(--font-mono);
+  color: var(--text); background: var(--bg); outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+input[type="text"]::placeholder { color: var(--text-3); }
+input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); background: var(--surface); }
+
+.input-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border-radius: 50%;
+  border: none; background: var(--surface-3); color: var(--text-3);
+  font-size: .8rem; cursor: pointer; display: none;
+  align-items: center; justify-content: center; line-height: 1;
+  transition: background .15s, color .15s;
+}
+.input-clear:hover { background: var(--error); color: white; }
+.input-wrap:not(:has(input:placeholder-shown)) .input-clear { display: flex; }
+
+.btn {
+  border: none; border-radius: var(--radius-sm); color: #fff;
+  font-family: var(--font-sans); font-size: 0.88rem; font-weight: 600;
+  padding: 0 18px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: background var(--transition), transform .1s, box-shadow var(--transition);
+  height: auto;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-glow); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.btn-primary { background: var(--primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dk); }
+.btn-ocr {
+  background: var(--surface); color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.btn-ocr:hover:not(:disabled) { border-color: var(--secondary); color: var(--secondary); background: var(--secondary-lt); box-shadow: 0 4px 12px rgba(230,126,34,.12); }
+
+/* ── Chips ────────────────────────────────────────────────── */
+.examples-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.examples-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text-2); font-size: 0.78rem; font-family: var(--font-mono);
+  padding: 4px 10px; cursor: pointer; user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform .1s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.chip:hover { background: var(--primary-lt); border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+.chip .chip-tip {
+  font-size: 0.65rem; font-family: var(--font-sans); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3); background: var(--surface); padding: 1px 5px;
+  border-radius: 4px; border: 1px solid var(--border);
+}
+.chip:hover .chip-tip { color: var(--primary); border-color: var(--primary-lt); }
+
+/* ── Workspace Layout ─────────────────────────────────────── */
+.workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.results-col { min-width: 0; }
+.tools-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; position: sticky; top: 20px; }
+
+/* ── Loader ───────────────────────────────────────────────── */
+.loader { display: none; align-items: center; justify-content: center; gap: 10px; padding: 20px; color: var(--text-2); font-size: 0.86rem; }
+.spinner { width: 20px; height: 20px; border: 2.5px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Skeleton ─────────────────────────────────────────────── */
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: skeleton 1.5s infinite; border-radius: 6px; }
+@keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-box { height: 80px; margin-bottom: 10px; }
+.skeleton-line { height: 14px; margin-bottom: 8px; }
+.skeleton-line.short { width: 60%; }
+
+/* ── Empty State ──────────────────────────────────────────── */
+.empty-state {
+  color: var(--text-3); text-align: center; padding: 50px 24px;
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  transition: border-color var(--transition);
+}
+.empty-state:hover { border-color: var(--primary); }
+.empty-state .empty-icon { font-size: 2.5rem; opacity: .35; line-height: 1; }
+.empty-state p { font-size: 0.9rem; max-width: 280px; line-height: 1.5; }
+
+/* ── Result Boxes ─────────────────────────────────────────── */
+.sol-box {
+  background: var(--success-lt); border: 1.5px solid var(--success-bdr);
+  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px;
+  text-align: center; position: relative;
+  animation: fadeInUp .4s ease both;
+}
+.sol-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--success); margin-bottom: 10px; }
+.sol-val { font-size: 1.2rem; color: var(--text); margin-bottom: 4px; line-height: 1.5; word-break: break-word; }
+.sol-dec { color: var(--text-2); font-size: 0.82rem; font-family: var(--font-mono); }
+.num-badge { display: inline-block; background: #fff7e6; border: 1px solid #f7c86a; border-radius: 5px; color: #a06000; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; margin-top: 8px; }
+[data-theme="dark"] .num-badge { background: #2a2010; color: #f7c86a; border-color: #5c4515; }
+
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-3); font-size: .85rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .2s, color .15s, border-color .15s;
+}
+.sol-box:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--primary); border-color: var(--primary); }
+.copy-btn.copied { color: var(--success); border-color: var(--success-bdr); }
+
+.err-box {
+  background: var(--error-lt); border: 1.5px solid var(--error-bdr);
+  border-radius: var(--radius); color: var(--error);
+  padding: 14px 16px; margin-bottom: 12px; font-size: 0.88rem;
+  display: flex; align-items: flex-start; gap: 8px;
+  animation: shake .4s ease;
+}
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-2px)} 80%{transform:translateX(2px)} }
+
+.steps-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin: 18px 0 10px; }
+.step {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 8px;
+  transition: box-shadow var(--transition), transform .15s;
+  animation: fadeInUp .35s ease both;
+  position: relative;
+}
+.step:hover { box-shadow: var(--shadow); transform: translateX(2px); }
+.step-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.step-n { background: var(--primary-lt); border-radius: 5px; color: var(--primary); font-size: 0.68rem; font-weight: 700; padding: 3px 8px; text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; }
+.step-title { font-weight: 600; font-size: 0.88rem; }
+.step-desc { color: var(--text-2); font-size: 0.84rem; margin-bottom: 8px; line-height: 1.55; }
+.step-eq { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; text-align: center; font-size: 1.05rem; overflow-x: auto; }
+.step .copy-btn { top: 8px; right: 8px; }
+.step:hover .copy-btn { opacity: 1; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger step animations */
+.step:nth-child(1) { animation-delay: .05s; }
+.step:nth-child(2) { animation-delay: .10s; }
+.step:nth-child(3) { animation-delay: .15s; }
+.step:nth-child(4) { animation-delay: .20s; }
+.step:nth-child(5) { animation-delay: .25s; }
+.step:nth-child(6) { animation-delay: .30s; }
+
+/* ── Plot panel ───────────────────────────────────────────── */
+.plot-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  overflow: hidden; position: relative;
+  transition: background var(--transition), border-color var(--transition);
+}
+.plot-panel.expanded {
+  position: fixed; top: 16px; left: 16px; right: 16px; bottom: 16px;
+  z-index: 200; box-shadow: var(--shadow-lg); border-radius: var(--radius);
+  display: flex; flex-direction: column;
+}
+.plot-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2); flex-shrink: 0;
+}
+.plot-header-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+.plot-actions { display: flex; gap: 6px; }
+.plot-expand-btn {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-2);
+  font-size: 0.75rem; padding: 4px 10px; cursor: pointer;
+  font-weight: 500; transition: all var(--transition);
+}
+.plot-expand-btn:hover { background: var(--primary-lt); color: var(--primary); border-color: var(--primary); }
+.plot-body { padding: 8px; flex: 1; min-height: 0; }
+#plotly-graph { width: 100%; height: 300px; border-radius: 6px; }
+.plot-panel.expanded #plotly-graph { height: 100%; }
+.plot-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 200px; color: var(--text-3); font-size: 0.88rem; gap: 10px;
+}
+.plot-empty .plot-empty-icon { font-size: 2.2rem; opacity: .3; }
+
+/* ── Formula builder ──────────────────────────────────────── */
+.fb-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.fb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.fb-header-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.fb-body { padding: 12px 14px; }
+.fb-category { margin-bottom: 10px; }
+.fb-category-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 5px; }
+.fb-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.fb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; padding: 5px 4px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; user-select: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform .1s;
+}
+.fb-btn:hover { background: var(--primary-lt); border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+.fb-btn:active { transform: translateY(0); }
+.fb-btn.wide { grid-column: span 2; }
+
+.fb-preview-wrap { margin-top: 10px; }
+.fb-preview-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 5px; }
+.fb-preview {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  min-height: 42px; display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: var(--text-2); overflow-x: auto;
+}
+.fb-preview:empty::before { content: 'Type or click buttons — preview appears here'; color: var(--text-3); font-size: 0.78rem; font-style: italic; }
+
+/* ── History Sidebar ──────────────────────────────────────── */
+.history-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 180; backdrop-filter: blur(2px); }
+.history-overlay.show { display: block; }
+.history-sidebar {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 340px; max-width: 90vw;
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg); z-index: 190;
+  transform: translateX(100%); transition: transform .35s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+}
+.history-sidebar.open { transform: translateX(0); }
+.history-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+}
+.history-header h3 { font-size: 1rem; font-weight: 700; }
+.history-list { flex: 1; overflow-y: auto; padding: 8px; }
+.history-item {
+  padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  margin-bottom: 8px; cursor: pointer; transition: all var(--transition);
+  background: var(--bg);
+}
+.history-item:hover { border-color: var(--primary); background: var(--primary-lt); transform: translateX(-2px); }
+.history-item .hist-expr { font-family: var(--font-mono); font-size: 0.88rem; color: var(--text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-item .hist-meta { font-size: 0.72rem; color: var(--text-3); display: flex; gap: 8px; }
+.history-empty { text-align: center; color: var(--text-3); padding: 40px 20px; font-size: 0.88rem; }
+.history-footer { padding: 12px 18px; border-top: 1px solid var(--border); }
+.history-footer button { width: 100%; padding: 8px; border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--radius-sm); color: var(--text-2); font-weight: 500; cursor: pointer; transition: all var(--transition); }
+.history-footer button:hover { background: var(--error-lt); color: var(--error); border-color: var(--error-bdr); }
+
+/* ── Toast ────────────────────────────────────────────────── */
+.toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg); border-radius: var(--radius-sm);
+  padding: 12px 16px; font-size: 0.88rem; font-weight: 500;
+  display: flex; align-items: center; gap: 10px; min-width: 260px; max-width: 360px;
+  animation: toastIn .35s ease, toastOut .35s ease 3.5s forwards;
+  pointer-events: auto;
+}
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--error); }
+.toast.info { border-left: 3px solid var(--primary); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(10px) scale(.96); } }
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip); position: absolute;
+  bottom: calc(100% + 7px); left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--text); color: var(--bg);
+  font-family: var(--font-sans); font-size: 0.72rem; font-weight: 500;
+  padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity .15s ease, transform .15s ease;
+  z-index: 150; box-shadow: var(--shadow);
+}
+[data-tooltip]:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Plot overlay ─────────────────────────────────────────── */
+.plot-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 199; backdrop-filter: blur(2px); }
+.plot-overlay.show { display: block; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+  .tools-col { position: static; }
+  .history-sidebar { width: 100%; max-width: none; }
+}
+@media (max-width: 640px) {
+  .header { flex-wrap: wrap; }
+  .header h1 { font-size: 1.2rem; }
+  .input-row { flex-wrap: wrap; }
+  .input-wrap { width: 100%; flex: none; }
+  .input-row .btn { flex: 1; justify-content: center; padding: 12px; }
+  .fb-grid { grid-template-columns: repeat(5, 1fr); }
+  .plot-panel.expanded { top: 8px; left: 8px; right: 8px; bottom: 8px; border-radius: var(--radius-sm); }
+}
+
+/* ── Reduced motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- History Sidebar -->
+<div class="history-overlay" id="history-overlay" onclick="toggleHistory()"></div>
+<div class="history-sidebar" id="history-sidebar">
+  <div class="history-header">
+    <h3>Recent Equations</h3>
+    <button class="btn-icon" onclick="toggleHistory()" aria-label="Close history">✕</button>
+  </div>
+  <div class="history-list" id="history-list">
+    <div class="history-empty">No equations solved yet.</div>
+  </div>
+  <div class="history-footer">
+    <button onclick="clearHistory()">Clear History</button>
+  </div>
+</div>
+
+<!-- Global Ngrok Status Banner -->
+<div id="ngrok-banner" class="ngrok-banner">
+  <span>⏳ Checking GPU connection (Ngrok)…</span>
+  <button class="close-banner" onclick="dismissBanner()" aria-label="Dismiss banner">×</button>
+</div>
+
+<!-- LOGIN VIEW -->
+<div class="container" id="login-view" style="display:none;">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>Secure Login</h2>
+      <p class="login-sub">Math Solver microservices authentication</p>
+      <div class="input-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="etudiant" value="etudiant" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="projet" value="projet" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button id="login-btn" onclick="login()">
+        <span>Access Engine</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP VIEW -->
+<div class="container" id="app-view" style="display:none;">
+
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon" aria-hidden="true">∑</div>
+      <div>
+        <h1>Math Solver</h1>
+        <p class="header-sub">Engine pipeline with GPU OCR & Step-by-Step logic</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" data-tooltip="Toggle theme" aria-label="Toggle theme">🌙</button>
+      <button class="btn-icon" onclick="toggleHistory()" data-tooltip="History" aria-label="Open history">📜</button>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="mode-tabs" role="tablist">
+      <button class="mode-tab active" data-mode="solver" onclick="switchMode('solver')" role="tab" aria-selected="true">
+        <span class="tab-icon">⚙</span> Solver
+      </button>
+      <button class="mode-tab" data-mode="simplifier" onclick="switchMode('simplifier')" role="tab" aria-selected="false">
+        <span class="tab-icon">✦</span> Simplifier
+      </button>
+      <button class="mode-tab" data-mode="plotter" onclick="switchMode('plotter')" role="tab" aria-selected="false">
+        <span class="tab-icon">◲</span> Plotter
+      </button>
+    </div>
+
+    <div class="input-row">
+      <div class="input-wrap">
+        <input type="text" id="eq" placeholder="e.g. x^2 - 5x + 6 = 0" autocomplete="off" spellcheck="false" aria-label="Enter equation" />
+        <button class="input-clear" onclick="clearInput()" aria-label="Clear input">×</button>
+      </div>
+      <button class="btn btn-primary" id="btn-solve" onclick="solve()">
+        <span>Solve</span>
+      </button>
+
+      <!-- Hidden file input for OCR -->
+      <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="uploadImage()">
+      <button class="btn btn-ocr" id="btn-ocr" onclick="document.getElementById('imageInput').click()" data-tooltip="Extract equation from image using GPU">
+        <span>📷 OCR</span>
+      </button>
+    </div>
+
+    <div class="examples-header">
+      <div class="examples-label">Quick examples</div>
+    </div>
+    <div class="examples" id="examples-container"></div>
+  </div>
+
+  <div class="loader" id="loader"><div class="spinner"></div><span id="loader-text">Solving…</span></div>
+
+  <div class="workspace">
+    <!-- LEFT: Steps/Solutions -->
+    <div class="results-col" id="out">
+      <div class="empty-state">
+        <span class="empty-icon">∑</span>
+        <p>Results will appear here.<br>Type an equation or upload an image to begin.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT: Plotter + Formula builder -->
+    <div class="tools-col">
+      <div class="plot-overlay" id="plot-overlay" onclick="toggleExpandPlot()"></div>
+      <div class="plot-panel" id="plot-panel">
+        <div class="plot-header">
+          <span class="plot-header-title"><span>◲</span> Graph</span>
+          <div class="plot-actions">
+            <button class="plot-expand-btn" id="plot-expand-btn" onclick="toggleExpandPlot()">⛶ Expand</button>
+          </div>
+        </div>
+        <div class="plot-body">
+          <div id="plotly-graph">
+            <div class="plot-empty">
+              <span class="plot-empty-icon">◲</span>
+              <span>Graph will render here</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fb-panel">
+        <div class="fb-header"><span class="fb-header-title">Formula Builder</span></div>
+        <div class="fb-body">
+          <div class="fb-category">
+            <div class="fb-category-label">Basic</div>
+            <div class="fb-grid">
+              <button class="fb-btn" onclick="fbInsert(' + ')">+</button>
+              <button class="fb-btn" onclick="fbInsert(' - ')">−</button>
+              <button class="fb-btn" onclick="fbInsert(' * ')">×</button>
+              <button class="fb-btn" onclick="fbInsert(' / ')">÷</button>
+              <button class="fb-btn" onclick="fbInsert(' = ')">=</button>
+              <button class="fb-btn" onclick="fbInsert('^')">xⁿ</button>
+              <button class="fb-btn" onclick="fbInsert('sqrt()')">√</button>
+              <button class="fb-btn" onclick="fbInsert('()')">( )</button>
+              <button class="fb-btn" onclick="fbInsert('.')">.</button>
+              <button class="fb-btn" onclick="fbInsert('\frac{}{}')">½</button>
+              <button class="fb-btn" onclick="fbInsert('\int_{}^{}')">∫</button>
+              <button class="fb-btn" onclick="fbInsert('\lim_{}')">lim</button>
+            </div>
+          </div>
+          <div class="fb-category">
+            <div class="fb-category-label">Functions</div>
+            <div class="fb-grid">
+              <button class="fb-btn" onclick="fbInsert('sin()')">sin</button>
+              <button class="fb-btn" onclick="fbInsert('cos()')">cos</button>
+              <button class="fb-btn" onclick="fbInsert('tan()')">tan</button>
+              <button class="fb-btn" onclick="fbInsert('log()')">log</button>
+              <button class="fb-btn" onclick="fbInsert('ln()')">ln</button>
+              <button class="fb-btn" onclick="fbInsert('abs()')">|x|</button>
+              <button class="fb-btn" onclick="fbInsert('exp()')">eˣ</button>
+            </div>
+          </div>
+          <div class="fb-category">
+            <div class="fb-category-label">Symbols</div>
+            <div class="fb-grid">
+              <button class="fb-btn" onclick="fbInsert('pi')">π</button>
+              <button class="fb-btn" onclick="fbInsert('e')">e</button>
+              <button class="fb-btn" onclick="fbInsert('infty')">∞</button>
+              <button class="fb-btn" onclick="fbInsert('x')">x</button>
+              <button class="fb-btn" onclick="fbInsert('y')">y</button>
+              <button class="fb-btn" onclick="fbInsert('z')">z</button>
+              <button class="fb-btn" onclick="fbInsert('theta')">θ</button>
+            </div>
+          </div>
+          <div class="fb-preview-wrap">
+            <div class="fb-preview-label">Live preview</div>
+            <div class="fb-preview" id="fb-preview"></div>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:10px;">
+            <button class="fb-btn wide" onclick="fbClear()" style="color:var(--error); border-color:var(--error-bdr);">Clear All</button>
+            <button class="fb-btn wide" onclick="fbInsert(' \cdot ')" style="color:var(--primary);">· Dot</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   STATE & CONFIG
+   ═══════════════════════════════════════════════════════════ */
+let currentMode = 'solver';
+let plotExpanded = false;
+let token = localStorage.getItem("jwt_token");
+let historyData = [];
+let previewDebounce = null;
+
+const EXAMPLES = {
+  solver: [
+    { label: 'x²-5x+6=0', expr: 'x^2 - 5x + 6 = 0', tip: 'Quadratic' },
+    { label: 'fraction', expr: '(x+1)/(x-2) = 3/4', tip: 'Rational' },
+    { label: 'log', expr: 'log(x) + log(x-3) = 1', tip: 'Logarithmic' },
+    { label: '2^x=32', expr: '2^x = 32', tip: 'Exponential' },
+    { label: 'sin(x)', expr: 'sin(x) = 0.5', tip: 'Trig' },
+    { label: 'system', expr: '2x + y = 10, x - y = 2', tip: '2-var system' }
+  ],
+  simplifier: [
+    { label: 'expand', expr: '(x+2)^3', tip: 'Binomial cube' },
+    { label: 'factor', expr: 'x^2 - 9', tip: 'Difference of squares' }
+  ],
+  plotter: [
+    { label: 'x²', expr: 'x^2', tip: 'Parabola' },
+    { label: '3D', expr: 'sin(x) * cos(y)', tip: 'Surface plot' },
+    { label: 'animation', expr: 'sin(x - t)', tip: 'Animated wave' }
+  ],
+};
+
+const PLACEHOLDERS = {
+  solver: 'e.g. x^2 - 5x + 6 = 0',
+  simplifier: 'e.g. (x+2)^3',
+  plotter: 'e.g. x^2 or sin(x) * cos(y)'
+};
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDecimal(d) {
+  if (d === undefined || d === null) return '';
+  const n = parseFloat(d);
+  if (isNaN(n)) return d;
+  // Remove trailing zeros after fixed(6)
+  return parseFloat(n.toFixed(6)).toString();
+}
+
+function showToast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icon = type==='success' ? '✓' : type==='error' ? '✕' : 'ℹ';
+  t.innerHTML = `<span>${icon}</span><span>${escapeHtml(msg)}</span>`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function copyText(text, btnEl) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (btnEl) { btnEl.classList.add('copied'); btnEl.textContent = '✓'; setTimeout(()=>{ btnEl.classList.remove('copied'); btnEl.textContent = '⎘'; }, 1500); }
+    showToast('Copied to clipboard', 'success');
+  }).catch(() => showToast('Failed to copy', 'error'));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   THEME
+   ═══════════════════════════════════════════════════════════ */
+function initTheme() {
+  const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateThemeIcon(next);
+  // Resize plot if exists
+  const g = document.getElementById('plotly-graph');
+  if (g && g.data) setTimeout(() => Plotly.Plots.resize(g), 100);
+}
+function updateThemeIcon(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HISTORY
+   ═══════════════════════════════════════════════════════════ */
+function toggleHistory() {
+  document.getElementById('history-sidebar').classList.toggle('open');
+  document.getElementById('history-overlay').classList.toggle('show');
+}
+
+function addToHistory(equation, mode, resultPreview) {
+  historyData.unshift({ equation, mode, preview: resultPreview || equation, time: new Date() });
+  if (historyData.length > 50) historyData.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  if (!historyData.length) {
+    list.innerHTML = '<div class="history-empty">No equations solved yet.</div>';
+    return;
+  }
+  list.innerHTML = historyData.map((h, i) => {
+    const timeStr = h.time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return `<div class="history-item" onclick="restoreHistory(${i})">
+      <div class="hist-expr">${escapeHtml(h.equation)}</div>
+      <div class="hist-meta"><span>${timeStr}</span><span style="text-transform:capitalize">${h.mode}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function restoreHistory(idx) {
+  const h = historyData[idx];
+  if (!h) return;
+  switchMode(h.mode);
+  document.getElementById('eq').value = h.equation;
+  updatePreview();
+  toggleHistory();
+  showToast('Restored from history', 'info');
+}
+
+function clearHistory() {
+  historyData = [];
+  renderHistory();
+  showToast('History cleared', 'info');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AUTH FLOW  (API logic untouched)
+   ═══════════════════════════════════════════════════════════ */
+function checkAuth() {
+  if (token) {
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('app-view').style.display = 'block';
+  } else {
+    document.getElementById('login-view').style.display = 'block';
+    document.getElementById('app-view').style.display = 'none';
+  }
+}
+
+async function login() {
+  const u = document.getElementById('username').value;
+  const p = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({username: u, password: p})
+    });
+    if (res.ok) {
+      const data = await res.json();
+      token = data.access_token;
+      localStorage.setItem("jwt_token", token);
+      checkAuth();
+      showToast('Welcome back!', 'success');
+    } else {
+      errEl.innerHTML = '<span>⚠</span> Invalid credentials';
+    }
+  } catch(e) {
+    errEl.innerHTML = '<span>⚠</span> Error connecting to auth service';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function logout() {
+  token = null;
+  localStorage.removeItem("jwt_token");
+  checkAuth();
+  showToast('Logged out', 'info');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NGROK POLLING  (API logic untouched)
+   ═══════════════════════════════════════════════════════════ */
+async function fetchNgrokUrl() {
+  try {
+    const res = await fetch('/api/ngrok/url');
+    const data = await res.json();
+    const banner = document.getElementById('ngrok-banner');
+    if (data.status === 'connected') {
+      banner.querySelector('span').innerHTML = `🔥 <strong>Colab GPU URL:</strong> <a href="${escapeHtml(data.url)}" target="_blank" style="color:white">${escapeHtml(data.url)}</a>`;
+      banner.style.background = 'var(--success)';
+    } else {
+      banner.querySelector('span').innerText = "Ngrok: " + data.status;
+      banner.style.background = 'var(--error)';
+    }
+  } catch(e) {}
+}
+setInterval(fetchNgrokUrl, 5000);
+
+function dismissBanner() {
+  document.getElementById('ngrok-banner').classList.add('hidden');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UI SETUP
+   ═══════════════════════════════════════════════════════════ */
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.mode === mode);
+    t.setAttribute('aria-selected', t.dataset.mode === mode);
+  });
+  buildExamples();
+  const input = document.getElementById('eq');
+  input.placeholder = PLACEHOLDERS[mode] || 'Enter expression…';
+  input.focus();
+}
+
+function buildExamples() {
+  const c = document.getElementById('examples-container');
+  const list = EXAMPLES[currentMode] || [];
+  c.innerHTML = '';
+  list.forEach(e => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.dataset.tooltip = e.tip;
+    chip.innerHTML = `<span>${escapeHtml(e.label)}</span><span class="chip-tip">${escapeHtml(e.tip)}</span>`;
+    chip.onclick = () => eg(e.expr, currentMode);
+    c.appendChild(chip);
+  });
+}
+
+function eg(expr, mode) {
+  switchMode(mode);
+  document.getElementById('eq').value = expr;
+  updatePreview();
+  solve();
+}
+
+function clearInput() {
+  document.getElementById('eq').value = '';
+  updatePreview();
+  document.getElementById('eq').focus();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CORE SOLVER & OCR  (API logic untouched)
+   ═══════════════════════════════════════════════════════════ */
+async function solve() {
+  const equation = document.getElementById('eq').value.trim();
+  if (!equation) return;
+
+  setLoading(true, "Solving equation…");
+
+  try {
+    const res = await fetch('/api/math/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ equation, mode: currentMode }),
+    });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json();
+    setLoading(false);
+    
+    // Clear skeletons BEFORE rendering
+    const out = document.getElementById('out');
+    out.innerHTML = ''; 
+    render(data, out);
+    // Add to history on success
+    if (!data.error || (data.solutions && data.solutions.length)) {
+      addToHistory(equation, currentMode, data.solutions?.[0]?.exact || equation);
+    }
+  } catch (e) {
+    setLoading(false);
+    document.getElementById('out').innerHTML = errBox('Server error — is the math service running?');
+  }
+}
+
+async function uploadImage() {
+  const file = document.getElementById('imageInput').files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64Image = e.target.result.split(',')[1];
+    setLoading(true, "Sending image to Colab GPU…");
+
+    try {
+      const res = await fetch('/api/math/solve-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ image_base64: base64Image, mode: currentMode }),
+      });
+      if (res.status === 401) { logout(); return; }
+      const data = await res.json();
+      pollTask(data.task_id);
+    } catch(err) { 
+      setLoading(false); 
+      document.getElementById('out').innerHTML = errBox('Error uploading image.'); 
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function pollTask(taskId) {
+  setLoading(true, `Waiting for Colab AI Model…`);
+
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/math/task/${taskId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.status === 401) { clearInterval(interval); logout(); return; }
+      const data = await res.json();
+
+      if (data.status === "completed") {
+        clearInterval(interval);
+        setLoading(false);
+
+        // Populate the input box with the OCR result
+        document.getElementById('eq').value = data.equation;
+        updatePreview();
+
+        // Show OCR box + Results
+        const out = document.getElementById('out');
+        
+        let imageHtml = '';
+        if (data.image) {
+          imageHtml = `
+            <div style="margin-bottom:12px; text-align:center;">
+              <img src="data:image/png;base64,${data.image}" style="max-height:120px; border-radius:6px; border:1px solid var(--border); box-shadow:var(--shadow-sm);" alt="Uploaded math image">
+            </div>
+          `;
+        }
+        
+        out.innerHTML = `
+          <div class="sol-box" style="background:var(--secondary-lt); border-color:var(--secondary);">
+            <div class="sol-label" style="color:var(--secondary);">Detected from Image</div>
+            ${imageHtml}
+            <div class="sol-val" style="font-family:var(--font-mono);">$$${data.equation}$$</div>
+            <div style="font-size:0.8rem; color:var(--text-3); margin-top:8px;">Compare the original image above with the parsed LaTeX.</div>
+          </div>`;
+
+        const tempDiv = document.createElement('div');
+        render(data.result, tempDiv);
+        out.appendChild(tempDiv);
+
+        if (window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});
+
+        showToast('OCR completed successfully', 'success');
+      } else if (data.status === "error") {
+        clearInterval(interval);
+        setLoading(false);
+        document.getElementById('out').innerHTML = errBox(data.error);
+        showToast('OCR failed: ' + data.error, 'error');
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+function setLoading(active, msg) {
+  document.getElementById('btn-solve').disabled = active;
+  document.getElementById('btn-ocr').disabled = active;
+  document.getElementById('loader').style.display = active ? 'flex' : 'none';
+  if(msg) document.getElementById('loader-text').innerText = msg;
+  if(active) {
+    const out = document.getElementById('out');
+    out.innerHTML = `
+      <div class="skeleton skeleton-box"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line short"></div>
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-line short"></div>
+    `;
+  }
+}
+
+function errBox(msg) { return `<div class="err-box"><span>⚠</span><span>${escapeHtml(msg)}</span></div>`; }
+
+/* ═══════════════════════════════════════════════════════════
+   UI RENDERERS
+   ═══════════════════════════════════════════════════════════ */
+function render(data, out) {
+  // Graph rendering
+  const graphEl = document.getElementById('plotly-graph');
+  if (data.graph_data && data.graph_data.is_graph) {
+    graphEl.innerHTML = '';
+    const gd = data.graph_data;
+    const cfg = { responsive: true, displaylogo: false };
+    if (gd.type === 'animation' && gd.frames) {
+      Plotly.newPlot('plotly-graph', gd.traces, gd.layout, cfg).then(() => Plotly.addFrames('plotly-graph', gd.frames));
+    } else {
+      Plotly.newPlot('plotly-graph', gd.traces, gd.layout, cfg);
+    }
+    out.innerHTML = `<div class="sol-box" style="background:var(--primary-lt);border-color:var(--primary);">
+      <div class="sol-label" style="color:var(--primary);">Graph Generated</div>
+      <div style="color:var(--text-2);font-size:.86rem;">The plot is displayed on the right →</div>
+    </div>`;
+    return;
+  } else {
+    graphEl.innerHTML = `<div class="plot-empty"><span class="plot-empty-icon">◲</span><span>Graph will render here</span></div>`;
+  }
+
+  if (data.error && (!data.steps || !data.steps.length)) {
+    out.innerHTML = errBox(data.error); return; // Changed += to =
+  }
+
+  let html = '';
+  const sols = data.solutions || [];
+  if (sols.length > 0) {
+    html += `<div class="sol-box">`;
+    const lbl = (data.is_numerical ? 'Numerical ' : '') + (sols.length === 1 ? 'Solution' : 'Solutions');
+    html += `<div class="sol-label">${escapeHtml(lbl)}</div>`;
+
+    // Copy button for entire solution box
+    const allExact = sols.map(s => s.exact).join(', ');
+    html += `<button class="copy-btn" onclick="copyText('${escapeHtml(allExact)}', this)" title="Copy solutions">⎘</button>`;
+
+    if (data.is_system) {
+      for (const s of sols) {
+        html += `<div class="sol-val">$$${s.variable} = ${s.exact}$$</div>`;
+        if (s.decimal) html += `<div class="sol-dec">≈ ${formatDecimal(s.decimal)}</div>`;
+      }
+    } else {
+      for (const s of sols) {
+        // Fix the weird "x =" bug for expressions by falling back to Expression
+        const varName = s.variable || data.variable || 'Expression';
+        html += `<div class="sol-val">$$${varName} = ${s.exact}$$</div>`;
+        if (s.decimal && s.decimal !== s.exact) {
+          html += `<div class="sol-dec">≈ ${formatDecimal(s.decimal)}</div>`;
+        }
+      }
+    }
+    if (data.is_numerical) html += `<div class="num-badge">numerical approximation</div>`;
+    html += `</div>`;
+  } else if (data.error) {
+    html += errBox(data.error);
+  } else if (!data.steps || data.steps.length === 0) {
+    html += errBox('No solution found.');
+  }
+
+  const steps = data.steps || [];
+  if (steps.length) {
+    html += `<div class="steps-label">Step-by-step solution</div>`;
+    for (const s of steps) {
+      const desc = escapeHtml(s.description || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html += `<div class="step">
+        <button class="copy-btn" onclick="copyText('${escapeHtml(s.equation || '')}', this)" title="Copy equation">⎘</button>
+        <div class="step-hdr"><span class="step-n">Step ${s.step_number}</span><span class="step-title">${escapeHtml(s.title)}</span></div>`;
+      if (desc) html += `<div class="step-desc">${desc}</div>`;
+      if (s.equation) html += `<div class="step-eq">$$${s.equation}$$</div>`;
+      html += `</div>`;
+    }
+  }
+
+  // Final overwrite clears any remnants of skeletons
+  out.innerHTML = html; 
+  if(window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORMULA BUILDER
+   ═══════════════════════════════════════════════════════════ */
+function fbInsert(text) {
+  const input = document.getElementById('eq');
+  const start = input.selectionStart, end = input.selectionEnd, val = input.value;
+  const parenIdx = text.indexOf('()');
+  if (parenIdx !== -1) {
+    const before = text.substring(0, parenIdx+1), after = text.substring(parenIdx+1);
+    input.value = val.substring(0,start) + before + after + val.substring(end);
+    input.setSelectionRange(start+before.length, start+before.length);
+  } else {
+    input.value = val.substring(0,start) + text + val.substring(end);
+    input.setSelectionRange(start+text.length, start+text.length);
+  }
+  input.focus();
+  updatePreview();
+}
+
+function fbClear() { document.getElementById('eq').value = ''; updatePreview(); }
+
+function updatePreview() {
+  const raw = document.getElementById('eq').value.trim();
+  const preview = document.getElementById('fb-preview');
+  if (!raw) { preview.innerHTML = ''; return; }
+  try {
+    let latex = raw
+      .replace(/\*\*/g, '^')
+      .replace(/\*/g, ' \cdot ')
+      .replace(/sqrt\(([^)]*)\)/g, '\sqrt{$1}')
+      .replace(/sin\(/g, '\sin(')
+      .replace(/cos\(/g, '\cos(')
+      .replace(/tan\(/g, '\tan(')
+      .replace(/log\(/g, '\log(')
+      .replace(/ln\(/g, '\ln(')
+      .replace(/abs\(/g, '\left|')
+      .replace(/pi/g, '\pi')
+      .replace(/theta/g, '\theta')
+      .replace(/infty/g, '\infty');
+    if (window.katex) {
+      preview.innerHTML = '';
+      katex.render(latex, preview, { throwOnError: false, displayMode: true });
+    } else preview.textContent = raw;
+  } catch { preview.textContent = raw; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EVENTS & SHORTCUTS
+   ═══════════════════════════════════════════════════════════ */
+const eqInput = document.getElementById('eq');
+eqInput.addEventListener('input', () => {
+  clearTimeout(previewDebounce);
+  previewDebounce = setTimeout(updatePreview, 80);
+});
+eqInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); solve(); }
+  else if (e.key === 'Enter') { e.preventDefault(); solve(); }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (plotExpanded) toggleExpandPlot();
+    if (document.getElementById('history-sidebar').classList.contains('open')) toggleHistory();
+  }
+});
+
+function toggleExpandPlot() {
+  plotExpanded = !plotExpanded;
+  document.getElementById('plot-panel').classList.toggle('expanded', plotExpanded);
+  document.getElementById('plot-overlay').classList.toggle('show', plotExpanded);
+  document.getElementById('plot-expand-btn').textContent = plotExpanded ? '✕ Close' : '⛶ Expand';
+  const g = document.getElementById('plotly-graph');
+  if (g && g.data) setTimeout(() => Plotly.Plots.resize(g), 200);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════ */
+initTheme();
+buildExamples();
+checkAuth();
+fetchNgrokUrl();
+renderHistory();
+</script>
+</body>
+</html>

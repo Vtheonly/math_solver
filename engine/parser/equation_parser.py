@@ -1,16 +1,12 @@
 """
 Equation parser for the equation solving engine.
-
-Converts raw user input strings into structured Equation objects
-by tokenizing, parsing with SymPy, detecting variables, and
-assembling the full Equation model.
 """
 
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from sympy import Eq, Expr, parse_expr, sympify
+from sympy import Eq, Expr, parse_expr, sympify, Add
 from sympy.parsing.sympy_parser import (
     standard_transformations,
     implicit_multiplication_application,
@@ -26,45 +22,19 @@ from engine.utils.latex_formatter import LatexFormatter
 
 logger = get_logger(__name__)
 
-# SymPy parsing transformations
 TRANSFORMATIONS = standard_transformations + (implicit_multiplication_application,)
 
 
 class ParseError(Exception):
-    """Raised when an equation cannot be parsed."""
-
     def __init__(self, message: str, raw_input: str = ""):
         self.raw_input = raw_input
         super().__init__(f"Parse error: {message}")
 
 
 class EquationParser:
-    """
-    Parses raw equation strings into Equation model objects.
-
-    The parsing pipeline:
-    1. Validate input structure
-    2. Normalize (caret → power, ln → log, |x| → Abs(x))
-    3. Split on equals sign
-    4. Parse both sides with SymPy
-    5. Detect variables
-    6. Assemble Equation object with metadata
-    """
 
     @staticmethod
     def parse(raw_input: str) -> Equation:
-        """
-        Parse a single equation string into an Equation object.
-
-        Args:
-            raw_input: Raw equation string from the user.
-
-        Returns:
-            A fully populated Equation object.
-
-        Raises:
-            ParseError: If the input cannot be parsed.
-        """
         logger.info("Parsing equation: '%s'", raw_input)
 
         # Step 1: Validate
@@ -73,8 +43,15 @@ class EquationParser:
             logger.error("Validation failed: %s", error)
             raise ParseError(error, raw_input)
 
+        is_latex = Tokenizer.is_latex(raw_input)
+
         # Step 2: Normalize
-        normalized = Tokenizer.normalize(raw_input)
+        if is_latex:
+            normalized = Tokenizer.normalize_latex(raw_input)
+            logger.debug("Detected LaTeX. Normalized to: '%s'", normalized)
+        else:
+            normalized = Tokenizer.normalize(raw_input)
+            
         normalized = MatrixOperations.preprocess_matrix_syntax(normalized)
 
         # Step 3: Split on equals
@@ -85,26 +62,35 @@ class EquationParser:
 
         logger.debug("LHS string: '%s', RHS string: '%s'", lhs_str, rhs_str)
 
-        # Step 4: Parse with SymPy
-        try:
-            lhs = parse_expr(
-                lhs_str,
-                local_dict=PARSE_LOCAL_DICT,
-                transformations=TRANSFORMATIONS,
-            )
-        except Exception as e:
-            logger.error("Failed to parse LHS '%s': %s", lhs_str, e)
-            raise ParseError(f"Cannot parse left side '{lhs_str}': {e}", raw_input)
+        # Step 4: Parse with SymPy or latex2sympy
+        if is_latex:
+            try:
+                from latex2sympy2 import latex2sympy
+                lhs = latex2sympy(lhs_str) if lhs_str and lhs_str != "0" else sympify(0)
+                rhs = latex2sympy(rhs_str) if rhs_str and rhs_str != "0" else sympify(0)
+            except ImportError:
+                logger.error("latex2sympy2 is not installed!")
+                raise ParseError("LaTeX parsing requires the latex2sympy2 package.", raw_input)
+            except Exception as e:
+                logger.error("Failed to parse LaTeX: %s", e)
+                # Fallback to basic sympy parsing if it failed
+                try:
+                    lhs = parse_expr(lhs_str.replace('\\', ''), local_dict=PARSE_LOCAL_DICT, transformations=TRANSFORMATIONS)
+                    rhs = parse_expr(rhs_str.replace('\\', ''), local_dict=PARSE_LOCAL_DICT, transformations=TRANSFORMATIONS)
+                except Exception as e2:
+                    raise ParseError(f"Cannot parse LaTeX: {e}", raw_input)
+        else:
+            try:
+                lhs = parse_expr(lhs_str, local_dict=PARSE_LOCAL_DICT, transformations=TRANSFORMATIONS)
+            except Exception as e:
+                logger.error("Failed to parse LHS '%s': %s", lhs_str, e)
+                raise ParseError(f"Cannot parse left side '{lhs_str}': {e}", raw_input)
 
-        try:
-            rhs = parse_expr(
-                rhs_str,
-                local_dict=PARSE_LOCAL_DICT,
-                transformations=TRANSFORMATIONS,
-            )
-        except Exception as e:
-            logger.error("Failed to parse RHS '%s': %s", rhs_str, e)
-            raise ParseError(f"Cannot parse right side '{rhs_str}': {e}", raw_input)
+            try:
+                rhs = parse_expr(rhs_str, local_dict=PARSE_LOCAL_DICT, transformations=TRANSFORMATIONS)
+            except Exception as e:
+                logger.error("Failed to parse RHS '%s': %s", rhs_str, e)
+                raise ParseError(f"Cannot parse right side '{rhs_str}': {e}", raw_input)
 
         # Step 5: Build SymPy equation
         sympy_eq = Eq(lhs, rhs)
@@ -135,22 +121,6 @@ class EquationParser:
 
     @staticmethod
     def parse_system(raw_input: str) -> List[Equation]:
-        """
-        Parse a multi-equation input into a list of Equation objects.
-
-        Splits the input on newlines, commas, or semicolons,
-        then parses each equation individually and assigns
-        system metadata.
-
-        Args:
-            raw_input: Raw multi-equation string.
-
-        Returns:
-            List of Equation objects with system metadata.
-
-        Raises:
-            ParseError: If any equation cannot be parsed.
-        """
         equation_strings = Tokenizer.split_equations(raw_input)
 
         if not equation_strings:
@@ -173,11 +143,6 @@ class EquationParser:
 
     @staticmethod
     def _detect_fractions(eq: Eq) -> bool:
-        """
-        Detect whether an equation contains rational/fractional expressions.
-
-        Checks if any term has a denominator that isn't 1.
-        """
         try:
             for side in (eq.lhs, eq.rhs):
                 terms = Add.make_args(side)
@@ -191,6 +156,5 @@ class EquationParser:
 
     @staticmethod
     def _detect_absolute_value(eq: Eq) -> bool:
-        """Detect whether an equation contains absolute value expressions."""
         from sympy import Abs
         return eq.lhs.has(Abs) or eq.rhs.has(Abs)

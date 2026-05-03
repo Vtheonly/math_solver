@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # ═══════════════════════════════════════════════════════════
+  # 1. SERVICE REGISTRY — Consul
+  #    Dashboard: http://localhost:8500
+  # ═══════════════════════════════════════════════════════════
+  consul:
+    image: hashicorp/consul:latest
+    command: agent -dev -client=0.0.0.0
+    ports:
+      - "8500:8500"
+    networks:
+      - math-net
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════
+  # 2. API GATEWAY / REVERSE PROXY — Traefik
+  #    Dashboard: http://localhost:8080
+  #    Routes discovered automatically from Consul catalog
+  # ═══════════════════════════════════════════════════════════
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.consulcatalog=true"
+      - "--providers.consulcatalog.endpoint.address=consul:8500"
+      - "--providers.consulcatalog.exposedByDefault=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"       # Main entry point for all traffic
+      - "8080:8080"   # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - consul
+    networks:
+      - math-net
+    restart: unless-stopped
+  # ═══════════════════════════════════════════════════════════
+  # 3. MESSAGE BROKER — RabbitMQ
+  #    Dashboard: http://localhost:15672  (guest / guest)
+  #    Queues: ocr_tasks (UI→Colab), ocr_results (Colab→Engine)
+  # ═══════════════════════════════════════════════════════════
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"     # AMQP — Ngrok will tunnel this to Colab
+      - "15672:15672"   # Management dashboard
+    networks:
+      - math-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ═══════════════════════════════════════════════════════════
+  # 4. NGROK TUNNEL SERVICE — Auto-exposes RabbitMQ to Colab
+  #    Endpoint: GET /api/ngrok/url
+  # ═══════════════════════════════════════════════════════════
+  ngrok-service:
+    build: ./ngrok-service
+    environment:
+      - NGROK_AUTHTOKEN=35kKQyLoyaVL0vT7OGCeTD4u8F2_5pAjpyZgQUb4PLCmt17xX
+    depends_on:
+      consul:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - math-net
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════
+  # 5. UI SERVICE — Nginx serving the frontend
+  #    Registered in Consul, routed via Traefik at /
+  # ═══════════════════════════════════════════════════════════
+  ui-service:
+    build: ./ui-service
+    depends_on:
+      - consul
+      - traefik
+    networks:
+      - math-net
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ui.rule=PathPrefix(`/`)"
+      - "traefik.http.services.ui.loadbalancer.server.port=80"
+
+  # ═══════════════════════════════════════════════════════════
+  # 6. AUTH SERVICE — JWT Token Generation
+  #    Endpoint: POST /api/auth/login
+  # ═══════════════════════════════════════════════════════════
+  auth-service:
+    build: ./auth-service
+    depends_on:
+      - consul
+    networks:
+      - math-net
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════
+  # 7. MATH SERVICE — Core Engine + RabbitMQ Consumer
+  #    Endpoints: POST /api/math/solve
+  #               POST /api/math/solve-image
+  #               GET  /api/math/task/{id}
+  # ═══════════════════════════════════════════════════════════
+  math-service:
+    build:
+      context: .
+      dockerfile: math-service/Dockerfile
+    depends_on:
+      consul:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - math-net
+    restart: unless-stopped
+
+networks:
+  math-net:
+    driver: bridge
