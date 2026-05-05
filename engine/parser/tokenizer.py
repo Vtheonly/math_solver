@@ -37,12 +37,105 @@ class Tokenizer:
 
     @staticmethod
     def normalize_latex(text: str) -> str:
-        """Fix common OCR errors in LaTeX without breaking syntax."""
-        # Remove spaces between digits (e.g., "1 0" -> "10")
+        """
+        Fix common TAMER OCR errors in LaTeX without breaking syntax.
+
+        The OCR model frequently produces:
+        - Spaced-out letters inside \\operatorname{}, \\mathrm{}, \\text{}: "c o s" → "cos"
+        - Spaced-out digits: "1 6" → "16"
+        - "\\ell n" instead of "\\ln"
+        - Stray trailing periods/commas on equations
+        - Spaces before/after braces that break parsing
+        """
+        text = text.strip()
+
+        # ── 1. Fix spaced-out letters inside \operatorname{...}, \mathrm{...}, \text{...} ──
+        # e.g. \operatorname{c o s} → \operatorname{cos}
+        def _collapse_spaces_in_braces(m):
+            cmd = m.group(1)     # e.g. "\\operatorname"
+            inner = m.group(2)   # e.g. "c o s"
+            collapsed = inner.replace(' ', '')
+            return f'{cmd}{{{collapsed}}}'
+
+        text = re.sub(
+            r'(\\(?:operatorname|mathrm|text|textit|textbf|mathbf|mathcal|mathbb))\{([^}]*)\}',
+            _collapse_spaces_in_braces,
+            text,
+        )
+
+        # ── 2. Fix spaced-out standalone function names (no \operatorname wrapper) ──
+        # e.g. "l o g" → "log", "c o s" → "cos", "s i n" → "sin"
+        known_funcs = [
+            'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
+            'arcsin', 'arccos', 'arctan',
+            'sinh', 'cosh', 'tanh', 'coth',
+            'log', 'exp', 'det', 'dim', 'ker', 'deg',
+            'max', 'min', 'sup', 'inf', 'lim',
+            'gcd', 'hom', 'arg',
+        ]
+        for fn in known_funcs:
+            # Build pattern like "l\s+o\s+g" for "log"
+            spaced = r'\s+'.join(re.escape(c) for c in fn)
+            # Only match when not already preceded by a backslash (avoid double-fixing \log)
+            text = re.sub(
+                r'(?<!\\)(?<![a-zA-Z])' + spaced + r'(?![a-zA-Z])',
+                fn,
+                text,
+            )
+
+        # ── 3. Fix "\ell n" → "\ln"  (common TAMER misparse) ──
+        text = re.sub(r'\\ell\s*n\b', r'\\ln', text)
+
+        # ── 4. Remove spaces between digits: "1 6" → "16", "2 7" → "27" ──
         text = re.sub(r'(?<=\d)\s+(?=\d)', '', text)
-        # Collapse multiple spaces into one
+
+        # ── 5. Fix spaces around decimal points: "0 . 2" → "0.2" ──
+        text = re.sub(r'(\d)\s*\.\s*(\d)', r'\1.\2', text)
+
+        # ── 6. Remove stray trailing period/comma (not inside braces) ──
+        text = re.sub(r'[.,]\s*$', '', text)
+
+        # ── 7. Fix unbalanced braces (OCR often produces extra } at end) ──
+        text = Tokenizer._balance_braces(text)
+
+        # ── 8. Fix invalid \cdot right after ^{ (OCR misread of - sign) ──
+        text = re.sub(r'\^\{\s*\\cdot\s*', r'^{-', text)
+
+        # ── 9. Collapse multiple spaces into one ──
         text = re.sub(r'\s+', ' ', text)
+
+        logger.debug("Normalized LaTeX: '%s'", text)
         return text.strip()
+
+    @staticmethod
+    def _balance_braces(text: str) -> str:
+        """Fix unbalanced { } braces from OCR output."""
+        opens = text.count('{')
+        closes = text.count('}')
+        if closes > opens:
+            # Remove extra closing braces from the end
+            diff = closes - opens
+            # Walk backwards and remove the outermost extra '}'
+            result = list(text)
+            i = len(result) - 1
+            while diff > 0 and i >= 0:
+                if result[i] == '}':
+                    # Check if this brace is truly unmatched
+                    # by scanning from here to the end
+                    depth = 0
+                    for j in range(i, -1, -1):
+                        if result[j] == '}':
+                            depth += 1
+                        elif result[j] == '{':
+                            depth -= 1
+                    if depth > 0:  # more } than { from start to here
+                        result[i] = ''
+                        diff -= 1
+                i -= 1
+            text = ''.join(result)
+        elif opens > closes:
+            text += '}' * (opens - closes)
+        return text
 
     @staticmethod
     def split_equations(raw_input: str) -> List[str]:
@@ -114,12 +207,34 @@ class Tokenizer:
         return text.strip()
 
     @staticmethod
+    def _find_toplevel_equals(text: str) -> List[int]:
+        """Find positions of '=' that are NOT inside {} braces."""
+        depth = 0
+        positions = []
+        for i, ch in enumerate(text):
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth = max(0, depth - 1)
+            elif ch == '=' and depth == 0:
+                positions.append(i)
+        return positions
+
+    @staticmethod
     def validate_equation_string(text: str) -> Tuple[bool, str]:
         if not text or not text.strip():
             return False, "Empty input"
 
         text = text.strip()
-        if "=" not in text:
+
+        # Use brace-aware equals detection for LaTeX
+        if Tokenizer.is_latex(text):
+            toplevel_eq = Tokenizer._find_toplevel_equals(text)
+            has_equals = len(toplevel_eq) > 0
+        else:
+            has_equals = "=" in text
+
+        if not has_equals:
             raw_lower = text.lower()
             if raw_lower.startswith(("plot", "graph", "draw")):
                 pass
@@ -132,11 +247,15 @@ class Tokenizer:
             else:
                 return False, "Input must contain an '=' sign to be an equation"
 
-        equals_count = text.count("=")
-        if equals_count > 1:
+        if has_equals:
             if "==" in text:
                 return False, "Use single '=' for equations, not '==' for comparisons"
-            logger.warning("Multiple '=' signs found, splitting on first one")
+            if Tokenizer.is_latex(text):
+                eq_count = len(Tokenizer._find_toplevel_equals(text))
+            else:
+                eq_count = text.count("=")
+            if eq_count > 1:
+                logger.warning("Multiple top-level '=' signs found (%d), will use first one", eq_count)
 
         if not re.search(r'[a-zA-Z]', text):
             logger.info("No alphabetic characters found in equation")
@@ -145,7 +264,24 @@ class Tokenizer:
 
     @staticmethod
     def split_on_equals(text: str) -> Tuple[str, str]:
-        if "=" not in text:
+        """
+        Split on the main '=' sign.
+
+        For LaTeX, this is brace-aware: it only splits on '=' that is
+        NOT inside {} braces.  This prevents splitting on subscript
+        equals like \\sum_{j = 1}.
+
+        For chained equalities like 'w = expr1 = expr2', only the
+        first top-level '=' is used (LHS = 'w', RHS = 'expr1').
+        """
+        # Check for top-level equals
+        if Tokenizer.is_latex(text):
+            eq_positions = Tokenizer._find_toplevel_equals(text)
+        else:
+            eq_positions = [i for i, ch in enumerate(text) if ch == '=']
+
+        if not eq_positions:
+            # No equals sign — treat as expression = 0
             raw_lower = text.lower()
             if raw_lower.startswith(("plot", "graph", "draw")):
                 pattern = re.compile(r'^(plot|graph|draw)\s+', re.IGNORECASE)
@@ -153,9 +289,22 @@ class Tokenizer:
                 return stripped_cmd, "0"
             return text, "0"
 
-        parts = text.split("=", 1)
-        lhs = parts[0].strip()
-        rhs = parts[1].strip()
+        # Split on the first top-level '='
+        pos = eq_positions[0]
+        lhs = text[:pos].strip()
+
+        if len(eq_positions) >= 2:
+            # Chained equality: "w = expr1 = expr2"
+            # Take only up to the second '=' as the RHS
+            second_eq = eq_positions[1]
+            rhs = text[pos + 1:second_eq].strip()
+            logger.info(
+                "Chained equality detected (%d '=' signs). "
+                "Using first equation only: '%s = %s'",
+                len(eq_positions), lhs, rhs,
+            )
+        else:
+            rhs = text[pos + 1:].strip()
 
         if not lhs and not rhs:
             raise ValueError("Both sides of equation are empty")

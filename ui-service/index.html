@@ -798,6 +798,52 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/** Clean up common OCR LaTeX artifacts before KaTeX rendering */
+function sanitizeOcrLatex(tex) {
+  if (!tex) return '';
+  let s = tex;
+  // Fix spaced-out letters inside \operatorname{}, \mathrm{}, \text{}
+  s = s.replace(/(\\(?:operatorname|mathrm|text|textit|textbf|mathbf|mathcal|mathbb))\{([^}]*)\}/g, (_, cmd, inner) => cmd + '{' + inner.replace(/ /g,'') + '}');
+  // Fix spaced-out standalone function names: "l o g" → "log"
+  ['sin','cos','tan','cot','sec','csc','log','exp','det','dim','lim','max','min','sup','inf','gcd','arg','sinh','cosh','tanh'].forEach(fn => {
+    const pat = fn.split('').join('\\s+');
+    s = s.replace(new RegExp('(?<![a-zA-Z\\\\])' + pat + '(?![a-zA-Z])', 'g'), fn);
+  });
+  // Fix \ell n → \ln
+  s = s.replace(/\\ell\s*n\b/g, '\\ln');
+  // Fix invalid \cdot right after ^{ (OCR misread of minus sign)
+  s = s.replace(/\^\{\s*\\cdot\s*/g, '^{-');
+  // Remove spaces between digits
+  s = s.replace(/(\d)\s+(\d)/g, '$1$2');
+  // Fix "0 . 2" → "0.2"
+  s = s.replace(/(\d)\s*\.\s*(\d)/g, '$1.$2');
+  // Remove stray trailing period/comma
+  s = s.replace(/[.,]\s*$/, '');
+  // Fix unbalanced braces
+  let opens = (s.match(/\{/g) || []).length;
+  let closes = (s.match(/\}/g) || []).length;
+  if (closes > opens) {
+    // Remove extra } from end
+    let diff = closes - opens;
+    while (diff > 0 && s.endsWith('}')) { s = s.slice(0, -1); diff--; }
+  } else if (opens > closes) {
+    s += '}'.repeat(opens - closes);
+  }
+  // Collapse multiple spaces
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+/** Safely render LaTeX into an element with KaTeX, with fallback to raw text */
+function safeKatexRender(latex, element, displayMode = true) {
+  if (!window.katex) { element.textContent = latex; return; }
+  try {
+    katex.render(latex, element, { throwOnError: false, displayMode: displayMode });
+  } catch(e) {
+    element.textContent = latex;
+  }
+}
+
 function formatDecimal(d) {
   if (d === undefined || d === null) return '';
   const n = parseFloat(d);
@@ -1096,15 +1142,19 @@ async function pollTask(taskId) {
           <div class="sol-box" style="background:var(--secondary-lt); border-color:var(--secondary);">
             <div class="sol-label" style="color:var(--secondary);">Detected from Image</div>
             ${imageHtml}
-            <div class="sol-val" style="font-family:var(--font-mono);">$$${data.equation}$$</div>
+            <div class="sol-val ocr-latex-display" style="font-family:var(--font-mono);"></div>
             <div style="font-size:0.8rem; color:var(--text-3); margin-top:8px;">Compare the original image above with the parsed LaTeX.</div>
           </div>`;
+
+        // Render the OCR LaTeX safely with sanitization
+        const ocrEl = out.querySelector('.ocr-latex-display');
+        safeKatexRender(sanitizeOcrLatex(data.equation), ocrEl, true);
 
         const tempDiv = document.createElement('div');
         render(data.result, tempDiv);
         out.appendChild(tempDiv);
 
-        if (window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});
+        if (window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}], throwOnError: false});
 
         showToast('OCR completed successfully', 'success');
       } else if (data.status === "error") {
@@ -1214,7 +1264,7 @@ function render(data, out) {
 
   // Final overwrite clears any remnants of skeletons
   out.innerHTML = html; 
-  if(window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});
+  if(window.renderMathInElement) renderMathInElement(out, {delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}], throwOnError: false});
 }
 
 /* ═══════════════════════════════════════════════════════════

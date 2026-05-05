@@ -68,9 +68,29 @@ class EquationParser:
                 from latex2sympy2 import latex2sympy
                 lhs = latex2sympy(lhs_str) if lhs_str and lhs_str != "0" else sympify(0)
                 rhs = latex2sympy(rhs_str) if rhs_str and rhs_str != "0" else sympify(0)
+
+                # Guard against latex2sympy returning non-Expr types
+                # (e.g. BooleanFalse when RHS contains embedded '=' signs,
+                #  or list of Eq objects from chained equalities)
+                from sympy import Basic
+                for label, val in [("LHS", lhs), ("RHS", rhs)]:
+                    if isinstance(val, (bool, list)):
+                        raise ParseError(
+                            f"{label} parsed to unexpected type ({type(val).__name__}). "
+                            f"The LaTeX may contain unsupported syntax.",
+                            raw_input,
+                        )
+                    if isinstance(val, Basic) and val.is_Boolean:
+                        raise ParseError(
+                            f"{label} evaluated to a boolean ({val}). "
+                            f"Check for chained equalities or malformed LaTeX.",
+                            raw_input,
+                        )
             except ImportError:
                 logger.error("latex2sympy2 is not installed!")
                 raise ParseError("LaTeX parsing requires the latex2sympy2 package.", raw_input)
+            except ParseError:
+                raise  # Re-raise our own errors
             except Exception as e:
                 logger.error("Failed to parse LaTeX: %s", e)
                 # Fallback to basic sympy parsing if it failed
